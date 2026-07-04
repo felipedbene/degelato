@@ -9,6 +9,7 @@
 #import "DGGopherMenuParser.h"
 #import "DGApiParser.h"
 #import "DGFontManager.h"
+#import "DGAttributedStringRenderer.h"
 #import "AppDelegate.h"
 
 #define DG_GOPHER_STATUS_H 22.0
@@ -190,16 +191,23 @@
     _table = nil;
     NSTextView *tv = [[[NSTextView alloc] initWithFrame:[[_scroll contentView] bounds]] autorelease];
     [tv setEditable:NO];
-    [tv setRichText:NO];
-    [tv setFont:[DGFontManager documentFontOfSize:12]];
-    [tv setString:(text ? text : @"")];
-    // Non-wrapping so preformatted / ASCII-art text keeps its columns.
+    [tv setRichText:YES];
+    // Dark terminal-style background: ANSI-colored gophermaps assume it, and the
+    // renderer's light default keeps uncolored text readable.
+    [tv setBackgroundColor:[NSColor blackColor]];
+    // Non-wrapping so preformatted / ASCII-art / braille maps keep their columns.
     [tv setHorizontallyResizable:YES];
     [tv setVerticallyResizable:YES];
     [[tv textContainer] setContainerSize:NSMakeSize(FLT_MAX, FLT_MAX)];
     [[tv textContainer] setWidthTracksTextView:NO];
     [tv setMinSize:NSMakeSize(0, 0)];
     [tv setMaxSize:NSMakeSize(FLT_MAX, FLT_MAX)];
+
+    NSAttributedString *attr = [DGAttributedStringRenderer
+        attributedStringFromString:(text ? text : @"")
+                              font:[DGFontManager documentFontOfSize:12]];
+    [[tv textStorage] setAttributedString:attr];
+
     _textView = tv;
     [_scroll setDocumentView:tv];
     [_statusLabel setStringValue:[_resource locationSummary]];
