@@ -2,15 +2,31 @@
 # Build a 10.5-native .icns (classic is32/il32/ih32/it32 reps + 8-bit masks,
 # plus ic08/ic09 PNG for 10.6+) from the square source art. Run on a Mac with PIL.
 import struct, io, sys
-from PIL import Image
+from PIL import Image, ImageDraw
 
 SRC = "design/icon/degelato-icon-glossy.png"
 OUT = "Resources/DeGelato.icns"
 
 src = Image.open(SRC).convert("RGBA")
 w, h = src.size
-s = min(w, h)                      # center-crop to square
-src = src.crop(((w - s)//2, (h - s)//2, (w - s)//2 + s, (h - s)//2 + s))
+
+# The source art has an opaque WHITE frame around the rounded-rect icon. On 10.5
+# that shows as an ugly border, so flood-fill the white background (from all four
+# corners) to transparent and crop to the rounded rect, letting it fill the tile.
+rgb = src.convert("RGB")
+SENT = (255, 0, 255)
+for seed in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]:
+    ImageDraw.floodfill(rgb, seed, SENT, thresh=48)
+alpha = [0 if p == SENT else 255 for p in rgb.getdata()]
+mask = Image.new("L", (w, h)); mask.putdata(alpha)
+src.putalpha(mask)
+
+bb = src.getbbox()                 # tight bounds of the rounded rect
+if bb:
+    src = src.crop(bb)
+sw, sh = src.size
+s = min(sw, sh)                    # square it (rounded rect is ~square)
+src = src.crop(((sw - s)//2, (sh - s)//2, (sw - s)//2 + s, (sh - s)//2 + s))
 
 def icns_rle(data):
     out = bytearray(); i = 0; n = len(data)
