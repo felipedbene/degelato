@@ -44,7 +44,8 @@ MODEL_SRC = \
 	src/DGDebouncer.m \
 	src/DGServerPrefs.m \
 	src/DGCoverCache.m \
-	src/DGPlaylistItem.m
+	src/DGPlaylistItem.m \
+	src/DGMediaKeyRouter.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -61,12 +62,13 @@ UI_SRC = \
 	src/DGNowPlayingWindowController.m \
 	src/DGTrackCell.m \
 	src/DGLibraryWindowController.m \
+	src/DGMediaKeyTap.m \
 	src/DGPreferencesController.m \
 	src/AppDelegate.m \
 	src/main.m
 
 APP_SRC  = $(MODEL_SRC) $(NET_SRC) $(AUDIO_SRC) $(UI_SRC)
-APP_LIBS = -framework Cocoa -framework CoreFoundation -framework AudioToolbox
+APP_LIBS = -framework Cocoa -framework CoreFoundation -framework AudioToolbox -framework ApplicationServices
 
 # --- Default target ----------------------------------------------------------
 
@@ -118,7 +120,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGTimelineTests.m \
            tests/DGServerPrefsTests.m \
            tests/DGCoverCacheTests.m \
-           tests/DGPlaylistItemTests.m
+           tests/DGPlaylistItemTests.m \
+           tests/DGMediaKeyRouterTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"

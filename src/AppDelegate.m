@@ -33,6 +33,23 @@
     [[_nowPlaying window] makeKeyAndOrderFront:self];
     [NSApp activateIgnoringOtherApps:YES];
     [_nowPlaying startPolling];
+
+    // Global media keys (⏮ ⏯ ⏭). Fails gracefully if assistive access is off.
+    _mediaKeyTap = [[DGMediaKeyTap alloc] initWithDelegate:self];
+    [_mediaKeyTap start];
+}
+
+- (void)mediaKeyTap:(DGMediaKeyTap *)tap
+        receivedKey:(DGMediaKeyKind)kind
+            pressed:(BOOL)pressed
+           isRepeat:(BOOL)isRepeat
+{
+    switch ([DGMediaKeyRouter actionForKind:kind pressed:pressed isRepeat:isRepeat]) {
+        case DGMediaKeyActionTogglePlayPause: [_nowPlaying onPlayPause:nil]; break;
+        case DGMediaKeyActionNext:            [_nowPlaying onNext:nil];      break;
+        case DGMediaKeyActionPrevious:        [_nowPlaying onPrev:nil];      break;
+        default: break;
+    }
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender
@@ -70,6 +87,8 @@
 
 - (void)dealloc
 {
+    [_mediaKeyTap stop];
+    [_mediaKeyTap release];
     [_nowPlaying release];
     [_library release];
     [_prefs release];
