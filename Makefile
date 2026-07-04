@@ -110,7 +110,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGPLSParserTests.m \
            tests/DGTrackItemTests.m \
            tests/DGSnapshotGuardTests.m \
-           tests/DGDebouncerTests.m
+           tests/DGDebouncerTests.m \
+           tests/DGTimelineTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"

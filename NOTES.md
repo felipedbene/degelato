@@ -2,6 +2,33 @@
 
 Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
 
+## Permanent design constraints (fios 8–13 fix campaign)
+
+These are load-bearing. Full write-up in `design/INVESTIGATION-command-spam.md`.
+
+- **Cancel ≠ un-send (R1).** On the LAN the selector is on the wire within one
+  run-loop turn, so gopher-spot executes *every* command that touches the wire;
+  `-cancel` only stops us listening. No mechanism may assume a sent command can
+  be revoked. Rapid transport taps are therefore debounced BEFORE the wire
+  (`DGDebouncer`, Prev/Next): three fast Next taps skip one track, not three.
+  Idempotent `/now` polls are exempt — cancel-and-replace on a poll is fine.
+
+- **The ts-guard is mandatory — never remove it (R3).** gopher-spot runs two
+  load-balanced replicas, each micro-caching `/now` ~1 s, so consecutive polls
+  can return `ts` out of order. That is *expected* infrastructure behavior, not
+  a bug. `DGSnapshotGuard` drops any snapshot whose `ts` regressed; without it
+  the UI flip-flops (track rewinds, seek knob jumps). It resets on reconnect so
+  a backend clock-reset can't lock adoption out forever.
+
+- **The gopher client uses BSD sockets + the libc resolver on a worker thread,
+  BY DESIGN (R7).** CFStream via `CFStreamCreatePairWithSocketToHost` routed even
+  a numeric-literal host through CFHost/mDNSResponder, which hangs on this
+  network (documented flaky mDNS on Apple devices) — the connect opened no socket
+  at all and timed out. fio 8's A/B/C isolation proved it: BSD socket went from
+  ~2 % to ~100 % success. **Do not migrate back to CFStream-by-hostname.** All
+  client results are marshalled to the main thread; zero shared mutable state
+  (the PPC 970's weak memory model must never become relevant).
+
 ## Done
 - **Audio (Fio 2):** `DGAudioStreamer` = AudioFileStream → AudioQueue against the
   Icecast MP3, URL discovered from `/spot/stream.pls` (`DGPLSParser`). `wake?play=1`

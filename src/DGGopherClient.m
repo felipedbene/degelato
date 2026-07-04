@@ -93,7 +93,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     _running = YES;
     _done = NO;
     _wroteRequest = NO;
-    NSLog(@"DG-PROBE client START %p sel=%@", self, _selector);   // DG-PROBE
 
     // Belt-and-suspenders deadline on the main thread: even if a worker wedges
     // in a syscall, the transaction still fails and polling continues. The
@@ -116,7 +115,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
 
 - (void)cancel
 {
-    NSLog(@"DG-PROBE client CANCEL %p sel=%@ running=%d done=%d wrote=%d", self, _selector, _running, _done, _wroteRequest);   // DG-PROBE
     if (!_running || _done) {
         return;
     }
@@ -131,7 +129,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         return;
     }
     _done = YES;
-    NSLog(@"DG-PROBE client TIMEOUT %p sel=%@ wrote=%d", self, _selector, _wroteRequest);   // DG-PROBE
     id <DGGopherClientDelegate> d = _delegate;
     [self teardown];
     // Do NOT release here: the worker still holds the -start retain and will
@@ -241,7 +238,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         [pool release];
         return;
     }
-    NSLog(@"DG-PROBE client WROTE %p sel=%@", self, _selector);   // DG-PROBE
 
     // Read to EOF.
     NSMutableData *buf = [[NSMutableData alloc] init];
@@ -264,7 +260,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         [pool release];
         return;
     }
-    NSLog(@"DG-PROBE client EOF %p sel=%@ buffered=%lu", self, _selector, (unsigned long)[buf length]);   // DG-PROBE
     [self performSelectorOnMainThread:@selector(workerDidFinish:) withObject:buf waitUntilDone:NO];
     [buf release];   // performSelector retained it for the handoff
     [pool release];
@@ -286,7 +281,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         return;
     }
     _done = YES;
-    NSLog(@"DG-PROBE client FINISH %p sel=%@ bytes=%lu delegate=%p", self, _selector, (unsigned long)[data length], _delegate);   // DG-PROBE
     id <DGGopherClientDelegate> d = _delegate;
     [self teardown];
     [d dgGopherClient:self didFinishWithData:data];
@@ -300,7 +294,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         return;
     }
     _done = YES;
-    NSLog(@"DG-PROBE client FAIL %p sel=%@ err=%@ delegate=%p", self, _selector, [error localizedDescription], _delegate);   // DG-PROBE
     id <DGGopherClientDelegate> d = _delegate;
     [self teardown];
     [d dgGopherClient:self didFailWithError:error];
