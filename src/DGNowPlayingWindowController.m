@@ -9,6 +9,7 @@
 #import "DGPLSParser.h"
 #import "DGFontManager.h"
 #import "DGSnapshotGuard.h"
+#import "DGDebouncer.h"
 
 #define DG_HOST          @"10.0.100.112"
 #define DG_PORT          70
@@ -23,7 +24,10 @@
 - (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
 - (void)sendCommand:(NSString *)selector;
+- (void)debounceTransport:(NSString *)selector;
+- (void)fireTransport:(NSTimer *)timer;
 - (void)commitSeek:(NSTimer *)timer;
+- (void)commitSeekNow;
 - (void)catchUpPoll:(NSTimer *)timer;
 - (DGPlaybackState)effectiveState;
 - (void)updateCoverForSnapshot:(DGNowSnapshot *)snap;
@@ -107,6 +111,7 @@
                                             title:@"Refresh" action:@selector(refresh:)];
 
         _snapGuard = [[DGSnapshotGuard alloc] init];
+        _transportDebouncer = [[DGDebouncer alloc] init];
         _audioState = DGAudioIdle;
         [self render];
         [self renderAudio];
@@ -126,6 +131,9 @@
     [_coverAlbumId release];
     [_lastSnapshot release];
     [_snapGuard release];
+    [_transportTimer invalidate];
+    [_transportTimer release];
+    [_transportDebouncer release];
     [_streamURL release];
     [_audioError release];
     [super dealloc];
@@ -191,6 +199,9 @@
     [_seekCommitTimer invalidate];
     [_seekCommitTimer release];
     _seekCommitTimer = nil;
+    [_transportTimer invalidate];
+    [_transportTimer release];
+    _transportTimer = nil;
     [_catchUpTimer invalidate];
     [_catchUpTimer release];
     _catchUpTimer = nil;
@@ -337,8 +348,35 @@
     [self render];
 }
 
-- (void)onPrev:(id)sender { [self sendCommand:@"/spot/api/1/prev"]; }
-- (void)onNext:(id)sender { [self sendCommand:@"/spot/api/1/next"]; }
+// Prev/Next are debounced (decision #1): within a short window only the LAST
+// tap sends, so three fast Next taps skip one track, not three. The coalescing
+// happens before anything touches the wire — a sent command can't be un-sent
+// (R1), so intermediate taps must never be sent at all.
+- (void)onPrev:(id)sender { [self debounceTransport:@"/spot/api/1/prev"]; }
+- (void)onNext:(id)sender { [self debounceTransport:@"/spot/api/1/next"]; }
+
+- (void)debounceTransport:(NSString *)selector
+{
+    [_transportDebouncer setPending:selector];
+    [_transportTimer invalidate];
+    [_transportTimer release];
+    _transportTimer = [[NSTimer timerWithTimeInterval:0.30
+                                               target:self
+                                             selector:@selector(fireTransport:)
+                                             userInfo:nil
+                                              repeats:NO] retain];
+    [[NSRunLoop currentRunLoop] addTimer:_transportTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)fireTransport:(NSTimer *)timer
+{
+    [_transportTimer release];
+    _transportTimer = nil;
+    NSString *selector = [_transportDebouncer takePending];
+    if (selector != nil) {
+        [self sendCommand:selector];
+    }
+}
 
 - (void)wakeDevice:(id)sender { [self sendCommand:@"/spot/api/1/wake"]; }
 
@@ -356,24 +394,42 @@
     // eventual-consistency window, so the knob doesn't snap back to a stale /now.
     _seekHoldUntilMs = [self nowEpochMs] + 3000;
 
-    // Debounce: commit the seek once movement settles. This is input-agnostic —
-    // no NSLeftMouseUp sniffing — so keyboard adjustment commits too and never
-    // latches the slider.
-    [_seekCommitTimer invalidate];
-    [_seekCommitTimer release];
-    _seekCommitTimer = [[NSTimer timerWithTimeInterval:0.35
-                                                target:self
-                                              selector:@selector(commitSeek:)
-                                              userInfo:nil
-                                               repeats:NO] retain];
-    [[NSRunLoop currentRunLoop] addTimer:_seekCommitTimer forMode:NSRunLoopCommonModes];
+    // Commit trigger depends on input (DeToca-style, adapted for keyboard):
+    //  • mouse: commit ONCE at end-of-tracking (NSLeftMouseUp). No mid-drag
+    //    timer — the old 0.35 s common-modes debounce fired DURING the drag
+    //    whenever the knob dwelled, spraying /seek commands (R2).
+    //  • keyboard arrows: coalesce auto-repeat with a short debounce so a run of
+    //    key-repeats commits once. It is scheduled in NSDefaultRunLoopMode, so it
+    //    can never fire during a mouse drag (that runs in event-tracking mode) —
+    //    the mouse path is handled entirely by the mouse-up branch above.
+    NSEventType t = [[NSApp currentEvent] type];
+    if (t == NSLeftMouseUp) {
+        [_seekCommitTimer invalidate];   // cancel any stale keyboard debounce
+        [_seekCommitTimer release];
+        _seekCommitTimer = nil;
+        [self commitSeekNow];
+    } else if (t == NSKeyDown || t == NSKeyUp) {
+        [_seekCommitTimer invalidate];
+        [_seekCommitTimer release];
+        _seekCommitTimer = [[NSTimer timerWithTimeInterval:0.35
+                                                    target:self
+                                                  selector:@selector(commitSeek:)
+                                                  userInfo:nil
+                                                   repeats:NO] retain];
+        [[NSRunLoop currentRunLoop] addTimer:_seekCommitTimer forMode:NSDefaultRunLoopMode];
+    }
+    // else: NSLeftMouseDown / NSLeftMouseDragged — live scrub only, no commit.
 }
 
 - (void)commitSeek:(NSTimer *)timer
 {
     [_seekCommitTimer release];
     _seekCommitTimer = nil;
+    [self commitSeekNow];
+}
 
+- (void)commitSeekNow
+{
     long long dur = (_lastSnapshot != nil) ? [_lastSnapshot durationMs] : 0;
     if (dur <= 0) {
         return;

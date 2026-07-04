@@ -40,7 +40,8 @@ MODEL_SRC = \
 	src/DGApiParser.m \
 	src/DGPLSParser.m \
 	src/DGTrackItem.m \
-	src/DGSnapshotGuard.m
+	src/DGSnapshotGuard.m \
+	src/DGDebouncer.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -108,7 +109,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGGopherClientTests.m \
            tests/DGPLSParserTests.m \
            tests/DGTrackItemTests.m \
-           tests/DGSnapshotGuardTests.m
+           tests/DGSnapshotGuardTests.m \
+           tests/DGDebouncerTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"

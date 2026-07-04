@@ -20,6 +20,7 @@
 
 @class DGNowSnapshot;
 @class DGSnapshotGuard;
+@class DGDebouncer;
 
 typedef enum {
     DGAudioIdle = 0,
@@ -62,7 +63,9 @@ typedef enum {
     DGNowSnapshot   *_lastSnapshot;
     DGSnapshotGuard *_snapGuard;    // drops out-of-order /now from a staler replica
 
-    NSTimer         *_seekCommitTimer;   // debounce: commit a seek after the drag settles
+    NSTimer         *_seekCommitTimer;   // keyboard-only debounce: commit a seek after the arrows settle
+    DGDebouncer     *_transportDebouncer; // Prev/Next last-tap-wins coalescer
+    NSTimer         *_transportTimer;    // fires the debounced transport command
     long long        _seekHoldUntilMs;   // don't reconcile the seek slider until this epoch-ms
     long long        _volumeHoldUntilMs; // ditto for the volume slider (eventual consistency)
     BOOL             _online;            // last /now poll succeeded — freeze interpolation when NO
