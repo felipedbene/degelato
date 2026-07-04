@@ -28,6 +28,8 @@
 }
 
 - (id)initWithResource:(DGGopherResource *)resource parentWindow:(NSWindow *)parent;
-- (void)load;   // begin the fetch
+- (void)load;                                 // begin the network fetch
+- (void)loadLocalMenuText:(NSString *)text;   // render a menu from local text (bookmarks)
+- (DGGopherResource *)resource;               // for "Add Bookmark"
 
 @end

@@ -121,6 +121,20 @@
     if (on) { [_spinner startAnimation:nil]; } else { [_spinner stopAnimation:nil]; }
 }
 
+- (DGGopherResource *)resource
+{
+    return _resource;
+}
+
+- (void)loadLocalMenuText:(NSString *)text
+{
+    // No fetch: render a locally-held gophermap (the bookmarks file).
+    _menuMode = YES;
+    [_items release];
+    _items = [[DGGopherMenuParser parseMenu:(text ? text : @"")] retain];
+    [self renderMenu];
+}
+
 - (void)load
 {
     [self showSpinner:YES];
@@ -243,9 +257,28 @@
         }
         return;
     }
-    // Text / menu / search / sound → open a new cascaded gopher window.
-    DGGopherResource *res = [DGGopherResource resourceWithItem:item];
     AppDelegate *app = (AppDelegate *)[NSApp delegate];
+
+    if ([item kind] == DGGopherItemKindSearch) {
+        // Type 7: prompt for a query, then request "selector<TAB>query" as a menu.
+        NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+        [alert setMessageText:@"Search"];
+        [alert setInformativeText:([item displayString] ? [item displayString] : @"")];
+        [alert addButtonWithTitle:@"Search"];
+        [alert addButtonWithTitle:@"Cancel"];
+        NSTextField *input = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 24)] autorelease];
+        [alert setAccessoryView:input];
+        if ([alert runModal] != NSAlertFirstButtonReturn) { return; }
+        NSString *sel = [NSString stringWithFormat:@"%@\t%@",
+                         ([item selector] ? [item selector] : @""), [input stringValue]];
+        DGGopherResource *sres = [DGGopherResource resourceWithHost:[item host]
+            port:[item port] type:'1' selector:sel display:[item displayString]];
+        [app openGopherResource:sres fromWindow:[self window]];
+        return;
+    }
+
+    // Text / menu / sound → open a new cascaded gopher window.
+    DGGopherResource *res = [DGGopherResource resourceWithItem:item];
     if ([app respondsToSelector:@selector(openGopherResource:fromWindow:)]) {
         [app openGopherResource:res fromWindow:[self window]];
     }

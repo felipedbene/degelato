@@ -51,7 +51,8 @@ MODEL_SRC = \
 	src/DGGopherMenuParser.m \
 	src/DGANSIPalette.m \
 	src/DGANSISpan.m \
-	src/DGANSIParser.m
+	src/DGANSIParser.m \
+	src/DGBookmarkStore.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.

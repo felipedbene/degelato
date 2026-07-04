@@ -9,6 +9,7 @@
 #import "DGPreferencesController.h"
 #import "DGGopherWindowController.h"
 #import "DGGopherResource.h"
+#import "DGBookmarkStore.h"
 
 #define DG_GOPHER_HOME @"gopher.debene.dev"
 
@@ -21,6 +22,10 @@
 - (void)showPreferences:(id)sender;
 - (void)openLocation:(id)sender;
 - (void)goHome:(id)sender;
+- (void)addBookmark:(id)sender;
+- (void)showBookmarks:(id)sender;
+- (DGGopherWindowController *)makeGopherWindowForResource:(DGGopherResource *)res
+                                              fromWindow:(NSWindow *)parent;
 - (void)openGopherResource:(DGGopherResource *)res fromWindow:(NSWindow *)parent;
 - (void)gopherWindowWillClose:(NSNotification *)note;
 - (void)wakeDevice:(id)sender;
@@ -79,9 +84,10 @@
 
 #pragma mark - Gopher browser
 
-- (void)openGopherResource:(DGGopherResource *)res fromWindow:(NSWindow *)parent
+- (DGGopherWindowController *)makeGopherWindowForResource:(DGGopherResource *)res
+                                              fromWindow:(NSWindow *)parent
 {
-    if (res == nil) { return; }
+    if (res == nil) { return nil; }
     if (_gopherWindows == nil) { _gopherWindows = [[NSMutableArray alloc] init]; }
     DGGopherWindowController *wc =
         [[[DGGopherWindowController alloc] initWithResource:res parentWindow:parent] autorelease];
@@ -91,7 +97,35 @@
             name:NSWindowWillCloseNotification object:[wc window]];
     [wc showWindow:self];
     [[wc window] makeKeyAndOrderFront:self];
-    [wc load];
+    return wc;
+}
+
+- (void)openGopherResource:(DGGopherResource *)res fromWindow:(NSWindow *)parent
+{
+    [[self makeGopherWindowForResource:res fromWindow:parent] load];
+}
+
+- (void)addBookmark:(id)sender
+{
+    // Bookmark the front gopher window's resource.
+    NSWindow *key = [NSApp keyWindow];
+    NSUInteger i;
+    for (i = 0; i < [_gopherWindows count]; i++) {
+        DGGopherWindowController *wc = [_gopherWindows objectAtIndex:i];
+        if ([wc window] == key) {
+            [DGBookmarkStore addBookmarkForResource:[wc resource]];
+            return;
+        }
+    }
+    NSBeep();   // no gopher window is frontmost
+}
+
+- (void)showBookmarks:(id)sender
+{
+    DGGopherResource *res = [DGGopherResource resourceWithHost:@"bookmarks" port:70
+                                                         type:'1' selector:@"" display:@"Bookmarks"];
+    DGGopherWindowController *wc = [self makeGopherWindowForResource:res fromWindow:nil];
+    [wc loadLocalMenuText:[DGBookmarkStore bookmarksText]];
 }
 
 - (void)gopherWindowWillClose:(NSNotification *)note
@@ -220,6 +254,13 @@
     [[gphMenu addItemWithTitle:@"Open Location…"
                         action:@selector(openLocation:)
                  keyEquivalent:@"l"] setTarget:self];
+    [gphMenu addItem:[NSMenuItem separatorItem]];
+    [[gphMenu addItemWithTitle:@"Add Bookmark"
+                        action:@selector(addBookmark:)
+                 keyEquivalent:@"d"] setTarget:self];
+    [[gphMenu addItemWithTitle:@"Show Bookmarks"
+                        action:@selector(showBookmarks:)
+                 keyEquivalent:@""] setTarget:self];
 
     // Window menu.
     NSMenuItem *winItem = [[[NSMenuItem alloc] initWithTitle:@"Window"
