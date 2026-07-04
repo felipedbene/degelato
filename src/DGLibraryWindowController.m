@@ -27,6 +27,20 @@ static NSString *DGPercentEscape(NSString *s)
     return [(NSString *)esc autorelease];
 }
 
+// Escape a Spotify URI (spotify:type:<id>) for a selector query value. Unlike a
+// search query, the gopher-spot machine API does NOT percent-decode this — it
+// wants the raw colons — so we must NOT escape ':' (escaping it yields bad_uri).
+// We still escape the gopher/query delimiters and spaces defensively.
+static NSString *DGEscapeURI(NSString *s)
+{
+    if (s == nil) {
+        return @"";
+    }
+    CFStringRef esc = CFURLCreateStringByAddingPercentEscapes(
+        NULL, (CFStringRef)s, NULL, CFSTR("?=&+ #%\t\r\n"), kCFStringEncodingUTF8);
+    return [(NSString *)esc autorelease];
+}
+
 @interface DGLibraryWindowController ()
 - (void)onMode:(id)sender;
 - (void)nowTrackDidChange:(NSNotification *)note;
@@ -298,7 +312,7 @@ static NSString *DGPercentEscape(NSString *s)
         if ((NSUInteger)row >= [_results count]) { return; }
         DGTrackItem *it = [_results objectAtIndex:(NSUInteger)row];
         if ([it.uri length] == 0) { return; }
-        selector = [NSString stringWithFormat:@"/spot/play?uri=%@", DGPercentEscape(it.uri)];
+        selector = [NSString stringWithFormat:@"/spot/play?uri=%@", DGEscapeURI(it.uri)];
         status = [NSString stringWithFormat:@"playing  %@", (it.track ? it.track : @"?")];
     } else if (_mode == DGLibraryModePlaylists) {
         if ((NSUInteger)row >= [_playlists count]) { return; }
@@ -306,7 +320,7 @@ static NSString *DGPercentEscape(NSString *s)
         NSString *ctx = [pl contextURI];
         if ([ctx length] == 0) { return; }
         selector = [NSString stringWithFormat:@"/spot/play?context_uri=%@&offset=0",
-                    DGPercentEscape(ctx)];
+                    DGEscapeURI(ctx)];
         status = [NSString stringWithFormat:@"playing  %@", (pl.name ? pl.name : @"playlist")];
     } else {
         return;   // Fila is read-only
@@ -334,7 +348,7 @@ static NSString *DGPercentEscape(NSString *s)
     [_addClient cancel];
     [_addClient release];
     _addClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
-        selector:[NSString stringWithFormat:@"/spot/api/1/queue/add?%@", DGPercentEscape(it.uri)]] retain];
+        selector:[NSString stringWithFormat:@"/spot/api/1/queue/add?%@", DGEscapeURI(it.uri)]] retain];
     [_addClient setDelegate:self];
     [_statusLabel setStringValue:[NSString stringWithFormat:@"queued  %@", (it.track ? it.track : @"?")]];
     [_addClient start];
