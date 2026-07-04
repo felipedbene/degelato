@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>DeGelato</string>
+	<key>CFBundleIconFile</key>
+	<string>DeGelato</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.debene.degelato</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>DeGelato</string>
+	<key>CFBundleDisplayName</key>
+	<string>DeGelato</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleSignature</key>
+	<string>Gelo</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.5.0</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<!-- The bundled Cascadia Code TTF lives in Resources/Fonts and is registered
+	     automatically at launch on 10.5. -->
+	<key>ATSApplicationFontsPath</key>
+	<string>Fonts</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>DeGelato — a Spotify remote for gopher-spot. debene.dev</string>
+</dict>
+</plist>

@@ -1,0 +1,5 @@
+DeGelato.app/
+Tests.octest/
+.DS_Store
+build/
+*.o
