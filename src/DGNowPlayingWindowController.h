@@ -35,6 +35,7 @@ typedef enum {
     NSTextField *_trackLabel;
     NSTextField *_artistLabel;
     NSTextField *_albumLabel;
+    NSTextField *_stateLabel;
     NSTextField *_deviceLabel;
     NSTextField *_timeLabel;
     NSTextField *_volumeLabel;
@@ -58,7 +59,11 @@ typedef enum {
     DGGopherClient  *_coverClient;  // in-flight /cover fetch
     NSString        *_coverAlbumId; // album_id of the cover currently shown/fetching
     DGNowSnapshot   *_lastSnapshot;
-    BOOL             _userSeeking;  // suppress tick updates while dragging seek
+
+    NSTimer         *_seekCommitTimer;   // debounce: commit a seek after the drag settles
+    long long        _seekHoldUntilMs;   // don't reconcile the seek slider until this epoch-ms
+    long long        _volumeHoldUntilMs; // ditto for the volume slider (eventual consistency)
+    BOOL             _online;            // last /now poll succeeded — freeze interpolation when NO
 
     DGAudioStreamer *_streamer;
     NSString        *_streamURL;

@@ -14,6 +14,19 @@ Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
   live, issues `seek?` on mouse-up; a 1 Hz tick advances it between polls without
   fighting the drag (`_userSeeking`). Volume slider drives the API device volume.
 
+## Known trade-offs (from the fio-4 code review)
+- **onPlayPause vs stale state:** the play/pause choice reads `_lastSnapshot`,
+  which can be ~2 s stale (eventual consistency). If playback state changed on
+  another device within the poll window, the first press may send the no-op
+  command; the next poll corrects it. Optimistic toggling would need a "pending
+  intent" flag — deferred; low impact.
+- **Local output gain:** `DG_STREAM_VOLUME` is 1.0 on purpose — loudness is the
+  API device volume (what the Icecast pipe encodes), matching DeToca. If a stream
+  ever clips locally, expose the AudioQueue gain as a second, local-only slider.
+- **Slider reconciliation:** seek + volume sliders use a 3 s "hold" after a user
+  change so the stale command reply can't snap them back; the seek slider commits
+  via a 0.35 s debounce (input-agnostic — works for keyboard, no mouse-up sniff).
+
 ## Deferred to later fios
 - **Eventual consistency:** a command's returned `/now` can lag Spotify by
   ~1–2 s (verified: firing pause→play back-to-back, each reply showed the

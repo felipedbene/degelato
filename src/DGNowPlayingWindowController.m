@@ -1,6 +1,6 @@
 //
 //  DGNowPlayingWindowController.m
-//  DeGelato — fios 1–3
+//  DeGelato — fios 1–4
 //
 
 #import "DGNowPlayingWindowController.h"
@@ -22,6 +22,7 @@
 - (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
 - (void)sendCommand:(NSString *)selector;
+- (void)commitSeek:(NSTimer *)timer;
 - (void)updateCoverForSnapshot:(DGNowSnapshot *)snap;
 - (void)render;
 - (void)renderProgress;
@@ -61,7 +62,8 @@
         _trackLabel  = [self addLabelAtX:176 y:326 width:288 size:15 color:[NSColor controlTextColor]];
         _artistLabel = [self addLabelAtX:176 y:304 width:288 size:13 color:[NSColor controlTextColor]];
         _albumLabel  = [self addLabelAtX:176 y:282 width:288 size:12 color:[NSColor grayColor]];
-        _deviceLabel = [self addLabelAtX:176 y:256 width:288 size:12 color:[NSColor grayColor]];
+        _stateLabel  = [self addLabelAtX:176 y:256 width:288 size:12 color:[NSColor grayColor]];
+        _deviceLabel = [self addLabelAtX:176 y:234 width:288 size:12 color:[NSColor grayColor]];
 
         // Controls band, full width, below the cover.
         _timeLabel   = [self addLabelAtX:16 y:178 width:448 size:12 color:[NSColor grayColor]];
@@ -70,7 +72,7 @@
         [_seekSlider setMinValue:0.0];
         [_seekSlider setMaxValue:1.0];
         [_seekSlider setDoubleValue:0.0];
-        [_seekSlider setContinuous:YES];      // live scrub; command sent on mouse-up
+        [_seekSlider setContinuous:YES];      // live scrub; seek committed after a short debounce
         [_seekSlider setTarget:self];
         [_seekSlider setAction:@selector(onSeek:)];
         [c addSubview:_seekSlider];
@@ -176,6 +178,9 @@
     [_tickTimer invalidate];
     [_tickTimer release];
     _tickTimer = nil;
+    [_seekCommitTimer invalidate];
+    [_seekCommitTimer release];
+    _seekCommitTimer = nil;
     [_client cancel];
     [_client release];
     _client = nil;
@@ -207,8 +212,12 @@
 
 - (void)sendCommand:(NSString *)selector
 {
+    // Last press wins: cancel any in-flight command rather than silently
+    // dropping the new one, so rapid transport taps stay responsive.
     if (_cmdClient != nil) {
-        return;   // one command at a time; drop overlapping presses
+        [_cmdClient cancel];
+        [_cmdClient release];
+        _cmdClient = nil;
     }
     _cmdClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
                                         selector:selector] retain];
@@ -262,18 +271,39 @@
     double frac = [_seekSlider doubleValue];
     long long ms = (long long)(frac * (double)dur);
 
-    // Live time readout while dragging.
+    // Live time readout as the knob moves (mouse drag OR keyboard arrows).
     [_timeLabel setStringValue:[NSString stringWithFormat:@"time     %@ / %@",
         [self clockFromMs:ms], [self clockFromMs:dur]]];
 
-    if ([[NSApp currentEvent] type] == NSLeftMouseUp) {
-        _userSeeking = NO;
-        if (dur > 0) {
-            [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/seek?%lld", ms]];
-        }
-    } else {
-        _userSeeking = YES;   // suppress clock-tick fighting the drag
+    // Hold reconciliation off the seek slider through the drag AND the command's
+    // eventual-consistency window, so the knob doesn't snap back to a stale /now.
+    _seekHoldUntilMs = [self nowEpochMs] + 3000;
+
+    // Debounce: commit the seek once movement settles. This is input-agnostic —
+    // no NSLeftMouseUp sniffing — so keyboard adjustment commits too and never
+    // latches the slider.
+    [_seekCommitTimer invalidate];
+    [_seekCommitTimer release];
+    _seekCommitTimer = [[NSTimer scheduledTimerWithTimeInterval:0.35
+                                                         target:self
+                                                       selector:@selector(commitSeek:)
+                                                       userInfo:nil
+                                                        repeats:NO] retain];
+}
+
+- (void)commitSeek:(NSTimer *)timer
+{
+    [_seekCommitTimer release];
+    _seekCommitTimer = nil;
+
+    long long dur = (_lastSnapshot != nil) ? [_lastSnapshot durationMs] : 0;
+    if (dur <= 0) {
+        return;
     }
+    long long ms = (long long)([_seekSlider doubleValue] * (double)dur);
+    // Extend the hold so the ~1–2 s stale command reply can't rewind the knob.
+    _seekHoldUntilMs = [self nowEpochMs] + 3000;
+    [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/seek?%lld", ms]];
 }
 
 - (void)onVolume:(id)sender
@@ -282,6 +312,9 @@
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
     [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)pct]];
+    // Hold reconciliation off the volume slider through the eventual-consistency
+    // window, or the stale command reply snaps the thumb back to the old value.
+    _volumeHoldUntilMs = [self nowEpochMs] + 3000;
     [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/volume?%ld", (long)pct]];
 }
 
@@ -368,17 +401,23 @@
         // All of these return a /now snapshot (or an error document).
         NSDictionary *fields = [DGApiParser fieldsFromResponse:text];
         NSString *errCode = [fields objectForKey:@"error"];
+        BOOL looksLikeNow = ([fields objectForKey:@"state"] != nil ||
+                             [fields objectForKey:@"api"] != nil);
         if (errCode != nil) {
-            NSString *msg = [fields objectForKey:@"message"];
-            [_statusLabel setStringValue:[NSString stringWithFormat:@"error: %@",
-                (msg ? msg : errCode)]];
-        } else {
+            // The stable code is short; the human `message` can be long and would
+            // truncate in the status line.
+            [_statusLabel setStringValue:[NSString stringWithFormat:@"error: %@", errCode]];
+            _online = NO;   // no fresh state — freeze the clock instead of racing to 100%
+        } else if (looksLikeNow) {
             DGNowSnapshot *snap = [DGApiParser snapshotFromFields:fields];
             [_lastSnapshot release];
             _lastSnapshot = [snap retain];
+            _online = YES;
             [_statusLabel setStringValue:@""];
             [self render];
         }
+        // else: a bodyless / ack reply carrying no /now fields — keep the last
+        // snapshot rather than blanking the display with an all-defaults one.
 
         BOOL wasWake = (client == _wakeClient);
         if (client == _client)   { [_client release];   _client = nil; }
@@ -417,6 +456,7 @@
     }
     if (client == _client) {
         [_statusLabel setStringValue:@"offline — retrying"];
+        _online = NO;   // freeze interpolation; keep the last snapshot on screen
         [_client release];
         _client = nil;
         return;
@@ -481,6 +521,7 @@
         [_trackLabel setStringValue:@"connecting…"];
         [_artistLabel setStringValue:@""];
         [_albumLabel setStringValue:@""];
+        [_stateLabel setStringValue:@""];
         [_deviceLabel setStringValue:@""];
         [_timeLabel setStringValue:@""];
         [_volumeLabel setStringValue:@"volume"];
@@ -498,6 +539,14 @@
         [_albumLabel setStringValue:@""];
     }
 
+    NSString *state;
+    switch ([s state]) {
+        case DGPlaybackPlaying: state = @"playing"; break;
+        case DGPlaybackPaused:  state = @"paused";  break;
+        default:                state = @"stopped"; break;
+    }
+    [_stateLabel setStringValue:[NSString stringWithFormat:@"state    %@", state]];
+
     NSString *device;
     switch ([s device]) {
         case DGDeviceActive: device = @"active"; break;
@@ -508,11 +557,15 @@
 
     [_playPauseButton setTitle:([s state] == DGPlaybackPlaying ? @"Pause" : @"Play")];
 
-    if ([s hasVolume]) {
-        [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)[s volume]]];
-        [_volumeSlider setDoubleValue:(double)[s volume]];
-    } else {
-        [_volumeLabel setStringValue:@"volume  —"];
+    // Don't reconcile the volume slider while the user's just-set value is still
+    // settling on the server (see onVolume:).
+    if ([self nowEpochMs] >= _volumeHoldUntilMs) {
+        if ([s hasVolume]) {
+            [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)[s volume]]];
+            [_volumeSlider setDoubleValue:(double)[s volume]];
+        } else {
+            [_volumeLabel setStringValue:@"volume  —"];
+        }
     }
 
     [self renderProgress];
@@ -521,18 +574,24 @@
 - (void)renderProgress
 {
     DGNowSnapshot *s = _lastSnapshot;
+    long long now = [self nowEpochMs];
+    BOOL holdSeek = (now < _seekHoldUntilMs);   // user is scrubbing / just sought
+    if (holdSeek) {
+        return;   // leave the knob + time where onSeek: put them
+    }
     if (s == nil || ![s hasTrack]) {
         [_timeLabel setStringValue:@"time     —"];
-        if (!_userSeeking) { [_seekSlider setDoubleValue:0.0]; }
+        [_seekSlider setDoubleValue:0.0];
         return;
     }
     long long dur = [s durationMs];
-    long long pos = [s interpolatedPositionMsAtEpochMs:[self nowEpochMs]];
+    // Freeze at the snapshot's stored position when offline / after an error —
+    // otherwise the 1 Hz tick keeps interpolating a stale "playing" snapshot and
+    // the bar races to 100% during an outage.
+    long long pos = _online ? [s interpolatedPositionMsAtEpochMs:now] : [s positionMs];
     [_timeLabel setStringValue:[NSString stringWithFormat:@"time     %@ / %@",
         [self clockFromMs:pos], [self clockFromMs:dur]]];
-    if (!_userSeeking) {
-        [_seekSlider setDoubleValue:(dur > 0 ? (double)pos / (double)dur : 0.0)];
-    }
+    [_seekSlider setDoubleValue:(dur > 0 ? (double)pos / (double)dur : 0.0)];
 }
 
 - (void)renderAudio
