@@ -53,6 +53,7 @@ UI_SRC = \
 	src/DGFontManager.m \
 	src/DGNowPlayingWindowController.m \
 	src/DGSearchWindowController.m \
+	src/DGQueueWindowController.m \
 	src/AppDelegate.m \
 	src/main.m
 

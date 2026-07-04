@@ -21,9 +21,11 @@
     NSArray        *_results;       // of DGTrackItem
     DGGopherClient *_searchClient;  // in-flight /search
     DGGopherClient *_playClient;    // in-flight /spot/play
+    DGGopherClient *_queueClient;   // in-flight /queue/add
 }
 
 - (void)doSearch:(id)sender;
 - (void)playSelected:(id)sender;
+- (void)queueSelected:(id)sender;
 
 @end

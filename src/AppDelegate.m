@@ -6,10 +6,12 @@
 #import "AppDelegate.h"
 #import "DGNowPlayingWindowController.h"
 #import "DGSearchWindowController.h"
+#import "DGQueueWindowController.h"
 
 @interface AppDelegate ()
 - (void)buildMenuBar;
 - (void)openSearch:(id)sender;
+- (void)openQueue:(id)sender;
 - (void)wakeDevice:(id)sender;
 @end
 
@@ -44,6 +46,15 @@
     [[_search window] makeKeyAndOrderFront:self];
 }
 
+- (void)openQueue:(id)sender
+{
+    if (_queue == nil) {
+        _queue = [[DGQueueWindowController alloc] init];
+    }
+    [_queue showWindow:self];   // -showWindow: refreshes the queue
+    [[_queue window] makeKeyAndOrderFront:self];
+}
+
 // Wake without changing play/pause state; forwarded to the now-playing window,
 // which owns the gopher command path and adopts the returned /now.
 - (void)wakeDevice:(id)sender
@@ -55,6 +66,7 @@
 {
     [_nowPlaying release];
     [_search release];
+    [_queue release];
     [super dealloc];
 }
 
@@ -91,6 +103,10 @@
     [[ctlMenu addItemWithTitle:@"Search…"
                         action:@selector(openSearch:)
                  keyEquivalent:@"f"] setTarget:self];
+    [[ctlMenu addItemWithTitle:@"Queue"
+                        action:@selector(openQueue:)
+                 keyEquivalent:@"u"] setTarget:self];
+    [ctlMenu addItem:[NSMenuItem separatorItem]];
     [[ctlMenu addItemWithTitle:@"Wake Device"
                         action:@selector(wakeDevice:)
                  keyEquivalent:@""] setTarget:self];

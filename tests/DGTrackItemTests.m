@@ -67,4 +67,20 @@
     STAssertTrue([first.track length] > 0, @"first result has a name");
 }
 
+- (void)testFixtureQueueParses
+{
+    const char *dir = getenv("DG_FIXTURES");
+    if (dir == NULL) { return; }
+    NSString *path = [[NSString stringWithUTF8String:dir]
+                      stringByAppendingPathComponent:@"queue_sample.txt"];
+    NSString *body = [NSString stringWithContentsOfFile:path
+                                               encoding:NSUTF8StringEncoding error:NULL];
+    if (body == nil) { return; }
+    // Same item.<i>.* shape as /search — one model serves both endpoints.
+    NSArray *items = [DGTrackItem itemsFromResponse:body];
+    STAssertTrue([items count] > 0, @"real /queue fixture yields upcoming tracks");
+    STAssertTrue([[[items objectAtIndex:0] uri] hasPrefix:@"spotify:track:"],
+                 @"first queued item has a track uri");
+}
+
 @end

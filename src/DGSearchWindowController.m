@@ -95,14 +95,22 @@ static NSString *DGPercentEscape(NSString *s)
         [scroll setDocumentView:_table];
         [c addSubview:scroll];
 
-        _statusLabel = [[[NSTextField alloc] initWithFrame:NSMakeRect(16, 14, 528, 20)] autorelease];
+        NSButton *queueBtn = [[[NSButton alloc] initWithFrame:NSMakeRect(432, 8, 112, 28)] autorelease];
+        [queueBtn setBezelStyle:NSRoundedBezelStyle];
+        [queueBtn setTitle:@"Add to Queue"];
+        [queueBtn setTarget:self];
+        [queueBtn setAction:@selector(queueSelected:)];
+        [queueBtn setAutoresizingMask:(NSViewMinXMargin | NSViewMaxYMargin)];
+        [c addSubview:queueBtn];
+
+        _statusLabel = [[[NSTextField alloc] initWithFrame:NSMakeRect(16, 14, 408, 20)] autorelease];
         [_statusLabel setEditable:NO];
         [_statusLabel setSelectable:YES];
         [_statusLabel setBordered:NO];
         [_statusLabel setBezeled:NO];
         [_statusLabel setDrawsBackground:NO];
         [_statusLabel setFont:font];
-        [_statusLabel setStringValue:@"Search Spotify — Enter to run, double-click a result to play."];
+        [_statusLabel setStringValue:@"Enter to search · double-click a result to play"];
         [_statusLabel setAutoresizingMask:(NSViewWidthSizable | NSViewMaxYMargin)];
         [c addSubview:_statusLabel];
     }
@@ -116,6 +124,8 @@ static NSString *DGPercentEscape(NSString *s)
     [_searchClient release];
     [_playClient cancel];
     [_playClient release];
+    [_queueClient cancel];
+    [_queueClient release];
     [_results release];
     [super dealloc];
 }
@@ -159,6 +169,27 @@ static NSString *DGPercentEscape(NSString *s)
     [_playClient start];
 }
 
+- (void)queueSelected:(id)sender
+{
+    NSInteger row = [_table selectedRow];
+    if (row < 0 || (NSUInteger)row >= [_results count]) {
+        [_statusLabel setStringValue:@"select a result to queue"];
+        return;
+    }
+    DGTrackItem *item = [_results objectAtIndex:(NSUInteger)row];
+    if ([item.uri length] == 0) {
+        return;
+    }
+    [_queueClient cancel];
+    [_queueClient release];
+    _queueClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+        selector:[NSString stringWithFormat:@"/spot/api/1/queue/add?%@", DGPercentEscape(item.uri)]] retain];
+    [_queueClient setDelegate:self];
+    [_statusLabel setStringValue:[NSString stringWithFormat:@"queued  %@ — %@",
+        (item.track ? item.track : @"?"), (item.artist ? item.artist : @"?")]];
+    [_queueClient start];
+}
+
 #pragma mark - DGGopherClientDelegate
 
 - (void)dgGopherClient:(DGGopherClient *)client didFinishWithData:(NSData *)data
@@ -192,6 +223,20 @@ static NSString *DGPercentEscape(NSString *s)
         _playClient = nil;
         return;
     }
+
+    if (client == _queueClient) {
+        // queue/add returns the fresh /queue; we don't show it here (the Queue
+        // window does), and the optimistic "queued …" status already stands. A
+        // bad_uri would arrive as an error document — surface it.
+        NSDictionary *fields = [DGApiParser fieldsFromResponse:[DGApiParser textFromData:data]];
+        NSString *errCode = [fields objectForKey:@"error"];
+        [_queueClient release];
+        _queueClient = nil;
+        if (errCode != nil) {
+            [_statusLabel setStringValue:[NSString stringWithFormat:@"error: %@", errCode]];
+        }
+        return;
+    }
 }
 
 - (void)dgGopherClient:(DGGopherClient *)client didFailWithError:(NSError *)error
@@ -206,6 +251,12 @@ static NSString *DGPercentEscape(NSString *s)
         [_playClient release];
         _playClient = nil;
         [_statusLabel setStringValue:@"could not start playback"];
+        return;
+    }
+    if (client == _queueClient) {
+        [_queueClient release];
+        _queueClient = nil;
+        [_statusLabel setStringValue:@"could not queue the track"];
         return;
     }
 }

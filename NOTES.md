@@ -37,10 +37,17 @@ Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
 - NSTableView data-source/delegate are informal on 10.5 (formal protocols 10.6+) —
   implemented, not declared, same lesson as NSStreamDelegate.
 
+## Done (fio 6)
+- **Queue:** DGQueueWindowController lists `/spot/api/1/queue` (DGTrackItem reused
+  verbatim — same item.<i>.* shape). Add-to-queue from search results via
+  `/spot/api/1/queue/add?<uri>` (returns /queue; there is no queue/clear in v1).
+  The queue window doesn't auto-refresh after an add elsewhere — press Refresh
+  (cross-window notification wasn't worth it for one action).
+
 ## Deferred to later fios
-- **Queue (Fio 6):** `/spot/api/1/queue` reuses DGTrackItem verbatim; add-to-queue
-  is `/spot/api/1/queue/add?<uri>` (returns /queue). A "Queue" action on a search
-  result is a one-liner once the queue window exists.
+- **Queue thumbnails / live refresh:** the queue table is text-only and refreshes
+  on open / Refresh. Cover thumbnails per row need the deferred multi-entry cover
+  cache; a periodic poll could keep "up next" live as tracks advance.
 - **Eventual consistency:** a command's returned `/now` can lag Spotify by
   ~1–2 s (verified: firing pause→play back-to-back, each reply showed the
   previous state). The UI adopts the reply optimistically; the 2 s poll
