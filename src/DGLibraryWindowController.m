@@ -11,6 +11,7 @@
 #import "DGFontManager.h"
 #import "DGServerPrefs.h"
 #import "DGCoverCache.h"
+#import "DGNowPlayingWindowController.h"   // DGNowTrackDidChangeNotification
 
 #define DG_THUMB_SIZE 64
 
@@ -28,6 +29,7 @@ static NSString *DGPercentEscape(NSString *s)
 
 @interface DGLibraryWindowController ()
 - (void)onMode:(id)sender;
+- (void)nowTrackDidChange:(NSNotification *)note;
 - (void)doSearch:(id)sender;
 - (void)playSelected:(id)sender;
 - (void)addSelected:(id)sender;
@@ -139,6 +141,10 @@ static NSString *DGPercentEscape(NSString *s)
         _coverClients = [[NSMutableDictionary alloc] init];
         _mode = DGLibraryModeBusca;
         [self updateChrome];
+        // Live up-next: refresh Fila off the now-playing poll (no timer here).
+        [[NSNotificationCenter defaultCenter] addObserver:self
+            selector:@selector(nowTrackDidChange:)
+                name:DGNowTrackDidChangeNotification object:nil];
     }
     [window release];
     return self;
@@ -146,6 +152,7 @@ static NSString *DGPercentEscape(NSString *s)
 
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_searchClient cancel];    [_searchClient release];
     [_queueClient cancel];     [_queueClient release];
     [_playlistsClient cancel]; [_playlistsClient release];
@@ -265,6 +272,15 @@ static NSString *DGPercentEscape(NSString *s)
 {
     if (_mode == DGLibraryModeFila)           { [self fetchQueue]; }
     else if (_mode == DGLibraryModePlaylists) { [self fetchPlaylists]; }
+}
+
+// The now-playing track advanced: refresh the up-next list, but only when Fila
+// is the visible mode (no point fetching /queue when nobody's watching it).
+- (void)nowTrackDidChange:(NSNotification *)note
+{
+    if (_mode == DGLibraryModeFila && [[self window] isVisible]) {
+        [self fetchQueue];
+    }
 }
 
 #pragma mark - Play / queue actions

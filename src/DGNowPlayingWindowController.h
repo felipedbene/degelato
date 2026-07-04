@@ -22,6 +22,10 @@
 @class DGSnapshotGuard;
 @class DGDebouncer;
 
+// Posted (object = the now-playing controller) when the adopted /now snapshot's
+// track changes, so the Library's Fila (up-next) can refresh live off the poll.
+extern NSString * const DGNowTrackDidChangeNotification;
+
 typedef enum {
     DGAudioIdle = 0,
     DGAudioWaking,        // wake?play=1 in flight

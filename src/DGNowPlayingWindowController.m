@@ -21,6 +21,8 @@
 #define DG_STREAM_VOLUME 1.0f    // loudness is controlled via the API device volume
 #define DG_COVER_SIZE    300     // now-playing cover px (also the cache key size)
 
+NSString * const DGNowTrackDidChangeNotification = @"DGNowTrackDidChangeNotification";
+
 @interface DGNowPlayingWindowController ()
 - (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
@@ -617,6 +619,7 @@
             // Drop out-of-order /now from a staler replica (two load-balanced
             // pods, ~1 s micro-cache each) — adopting it rewinds the UI (R3).
             if ([_snapGuard acceptTs:[snap ts]]) {
+                NSString *oldTrackId = [[[_lastSnapshot trackId] retain] autorelease];
                 [_lastSnapshot release];
                 _lastSnapshot = [snap retain];
                 // Keep the optimistic target in sync with reality whenever we're
@@ -628,6 +631,12 @@
                     _intendedState = [snap state];
                 }
                 [self render];
+                // Track advanced → tell the Library window so its Fila (up-next)
+                // refreshes live off this poll, with no timer of its own.
+                if (![oldTrackId isEqualToString:[snap trackId]]) {
+                    [[NSNotificationCenter defaultCenter]
+                        postNotificationName:DGNowTrackDidChangeNotification object:self];
+                }
             }
         }
         // else: a bodyless / ack reply carrying no /now fields — keep the last
