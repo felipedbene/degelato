@@ -8,3 +8,7 @@ dmg-stage/
 
 # Working campaign spec — not part of the project
 PROMPT.md
+
+# Python bytecode
+__pycache__/
+*.pyc
