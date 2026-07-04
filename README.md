@@ -10,7 +10,8 @@ LAN-only.
 parser, and a text-only now-playing window. **Fio 2** adds audio — live MP3
 playback of the gopher-spot Icecast stream via CoreAudio. **Fio 3** adds
 transport — play/pause/next/prev, a seek bar, and a volume slider, each a
-`/spot/api/1` command that returns a fresh `/now`.
+`/spot/api/1` command that returns a fresh `/now`. **Fio 4** adds album cover
+art, fetched from `/cover/<album_id>/<size>` and drawn beside the text.
 
 ## What it does
 

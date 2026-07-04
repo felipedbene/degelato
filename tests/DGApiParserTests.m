@@ -11,6 +11,9 @@
 #import "DGApiParser.h"
 #import "DGNowSnapshot.h"
 
+// Absolute path to a fixture under DG_FIXTURES (set by `make test`), or nil.
+static NSString *DGFixture(NSString *name);
+
 @interface DGApiParserTests : SenTestCase
 @end
 
@@ -190,6 +193,35 @@
 {
     STAssertEqualObjects([DGApiParser textFromData:[NSData data]], @"", @"empty data -> empty string");
     STAssertEqualObjects([DGApiParser textFromData:nil], @"", @"nil data -> empty string");
+}
+
+#pragma mark - dataIsJPEG
+
+- (void)testDataIsJPEG
+{
+    unsigned char jpeg[] = { 0xFF, 0xD8, 0xFF, 0xE0, 0x00 };
+    STAssertTrue([DGApiParser dataIsJPEG:[NSData dataWithBytes:jpeg length:sizeof(jpeg)]],
+                 @"FF D8 recognised as JPEG");
+    STAssertFalse([DGApiParser dataIsJPEG:[@"api\t1\r\nerror\tbad_range\r\n"
+                                           dataUsingEncoding:NSUTF8StringEncoding]],
+                  @"an error text document is not a JPEG");
+    STAssertFalse([DGApiParser dataIsJPEG:[NSData data]], @"empty is not a JPEG");
+    STAssertFalse([DGApiParser dataIsJPEG:nil], @"nil is not a JPEG");
+}
+
+- (void)testFixtureCoverIsJPEGErrorIsNot
+{
+    NSString *jpath = DGFixture(@"cover_sample.jpg");
+    NSString *epath = DGFixture(@"cover_error.txt");
+    if (jpath == nil) { return; }
+    STAssertTrue([DGApiParser dataIsJPEG:[NSData dataWithContentsOfFile:jpath]],
+                 @"real captured cover is a JPEG");
+    STAssertFalse([DGApiParser dataIsJPEG:[NSData dataWithContentsOfFile:epath]],
+                  @"real cover error body is text, not a JPEG");
+    // The error body parses as fields with an error key.
+    NSString *etext = [DGApiParser textFromData:[NSData dataWithContentsOfFile:epath]];
+    STAssertEqualObjects([[DGApiParser fieldsFromResponse:etext] objectForKey:@"error"],
+                         @"bad_range", @"cover error surfaces as error=bad_range");
 }
 
 - (void)testTextFromGarbageDoesNotCrash

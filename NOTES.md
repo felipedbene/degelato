@@ -20,7 +20,11 @@ Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
   previous state). The UI adopts the reply optimistically; the 2 s poll
   reconciles. A monotonic-ts guard (like DeToca's DTSnapshotGuard) would stop a
   staler replica from rewinding the UI — worth adding if two pods ever disagree.
-- **Cover art (Fio 4):** `/cover/<album_id>/<size>` — `album_id` already parsed.
+- **Cover disk cache:** Fio 4 keeps only a single in-memory entry (the current
+  album's NSImage), keyed by `album_id`, refetched on album change. DeToca's
+  DTCoverCache (two-level, disk-backed, block-based, NSCache) is deferred — NSCache
+  is 10.6+ and we don't yet need many thumbnails. Add a plain NSMutableDictionary
+  + on-disk store when the playlist window (many 64px thumbs) lands.
 - **Audio pause:** transport pause stops Spotify; the local stream keeps buffering
   silence. Could `AudioQueuePause` the streamer in sympathy, but the pipe is live
   radio — simplest to leave it and let Listen/Stop own the local side.

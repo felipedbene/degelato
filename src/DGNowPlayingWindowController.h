@@ -31,6 +31,7 @@ typedef enum {
 
 @interface DGNowPlayingWindowController : NSWindowController
     <DGGopherClientDelegate, DGAudioStreamerDelegate> {
+    NSImageView *_coverView;
     NSTextField *_trackLabel;
     NSTextField *_artistLabel;
     NSTextField *_albumLabel;
@@ -54,6 +55,8 @@ typedef enum {
     DGGopherClient  *_plsClient;    // in-flight /spot/stream.pls
     DGGopherClient  *_wakeClient;   // in-flight wake?play=1
     DGGopherClient  *_cmdClient;    // in-flight transport command
+    DGGopherClient  *_coverClient;  // in-flight /cover fetch
+    NSString        *_coverAlbumId; // album_id of the cover currently shown/fetching
     DGNowSnapshot   *_lastSnapshot;
     BOOL             _userSeeking;  // suppress tick updates while dragging seek
 

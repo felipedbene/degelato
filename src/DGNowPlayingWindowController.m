@@ -19,9 +19,10 @@
 #define DG_STREAM_VOLUME 1.0f    // loudness is controlled via the API device volume
 
 @interface DGNowPlayingWindowController ()
-- (NSTextField *)addLabelAtY:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
+- (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
 - (void)sendCommand:(NSString *)selector;
+- (void)updateCoverForSnapshot:(DGNowSnapshot *)snap;
 - (void)render;
 - (void)renderProgress;
 - (void)renderAudio;
@@ -36,7 +37,7 @@
 
 - (id)init
 {
-    NSRect frame = NSMakeRect(0, 0, 440, 324);
+    NSRect frame = NSMakeRect(0, 0, 480, 360);
     NSUInteger style = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask;
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
@@ -50,14 +51,22 @@
     if (self != nil) {
         NSView *c = [window contentView];
 
-        _trackLabel  = [self addLabelAtY:288 width:408 size:15 color:[NSColor controlTextColor]];
-        _artistLabel = [self addLabelAtY:266 width:408 size:13 color:[NSColor controlTextColor]];
-        _albumLabel  = [self addLabelAtY:246 width:408 size:12 color:[NSColor grayColor]];
-        _deviceLabel = [self addLabelAtY:222 width:408 size:12 color:[NSColor grayColor]];
+        // Cover art, top-left; now-playing text to its right.
+        _coverView = [[[NSImageView alloc] initWithFrame:NSMakeRect(16, 204, 148, 148)] autorelease];
+        [_coverView setImageScaling:NSImageScaleProportionallyUpOrDown];
+        [_coverView setImageFrameStyle:NSImageFrameGrayBezel];
+        [_coverView setEditable:NO];
+        [c addSubview:_coverView];
 
-        _timeLabel   = [self addLabelAtY:196 width:408 size:12 color:[NSColor grayColor]];
+        _trackLabel  = [self addLabelAtX:176 y:326 width:288 size:15 color:[NSColor controlTextColor]];
+        _artistLabel = [self addLabelAtX:176 y:304 width:288 size:13 color:[NSColor controlTextColor]];
+        _albumLabel  = [self addLabelAtX:176 y:282 width:288 size:12 color:[NSColor grayColor]];
+        _deviceLabel = [self addLabelAtX:176 y:256 width:288 size:12 color:[NSColor grayColor]];
 
-        _seekSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(16, 176, 408, 16)] autorelease];
+        // Controls band, full width, below the cover.
+        _timeLabel   = [self addLabelAtX:16 y:178 width:448 size:12 color:[NSColor grayColor]];
+
+        _seekSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(16, 158, 448, 16)] autorelease];
         [_seekSlider setMinValue:0.0];
         [_seekSlider setMaxValue:1.0];
         [_seekSlider setDoubleValue:0.0];
@@ -66,16 +75,16 @@
         [_seekSlider setAction:@selector(onSeek:)];
         [c addSubview:_seekSlider];
 
-        // Transport row, centered.
-        _prevButton      = [self addButtonWithFrame:NSMakeRect(120, 138, 60, 30)
+        // Transport row, centered (window mid-x = 240).
+        _prevButton      = [self addButtonWithFrame:NSMakeRect(140, 120, 60, 30)
                                               title:@"Prev" action:@selector(onPrev:)];
-        _playPauseButton = [self addButtonWithFrame:NSMakeRect(188, 138, 64, 30)
+        _playPauseButton = [self addButtonWithFrame:NSMakeRect(208, 120, 64, 30)
                                               title:@"Play" action:@selector(onPlayPause:)];
-        _nextButton      = [self addButtonWithFrame:NSMakeRect(260, 138, 60, 30)
+        _nextButton      = [self addButtonWithFrame:NSMakeRect(280, 120, 60, 30)
                                               title:@"Next" action:@selector(onNext:)];
 
-        _volumeLabel = [self addLabelAtY:104 width:120 size:12 color:[NSColor grayColor]];
-        _volumeSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(146, 104, 240, 16)] autorelease];
+        _volumeLabel = [self addLabelAtX:16 y:88 width:120 size:12 color:[NSColor grayColor]];
+        _volumeSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(146, 88, 300, 16)] autorelease];
         [_volumeSlider setMinValue:0.0];
         [_volumeSlider setMaxValue:100.0];
         [_volumeSlider setDoubleValue:100.0];
@@ -84,12 +93,12 @@
         [_volumeSlider setAction:@selector(onVolume:)];
         [c addSubview:_volumeSlider];
 
-        _audioLabel  = [self addLabelAtY:74 width:408 size:12 color:[NSColor controlTextColor]];
-        _statusLabel = [self addLabelAtY:48 width:200 size:12 color:[NSColor redColor]];
+        _audioLabel  = [self addLabelAtX:16 y:60 width:448 size:12 color:[NSColor controlTextColor]];
+        _statusLabel = [self addLabelAtX:16 y:36 width:220 size:12 color:[NSColor redColor]];
 
-        _listenButton  = [self addButtonWithFrame:NSMakeRect(232, 12, 92, 30)
+        _listenButton  = [self addButtonWithFrame:NSMakeRect(272, 8, 92, 30)
                                             title:@"Listen" action:@selector(toggleListen:)];
-        _refreshButton = [self addButtonWithFrame:NSMakeRect(332, 12, 92, 30)
+        _refreshButton = [self addButtonWithFrame:NSMakeRect(372, 8, 92, 30)
                                             title:@"Refresh" action:@selector(refresh:)];
 
         _audioState = DGAudioIdle;
@@ -106,16 +115,19 @@
     [self stopAudio];
     [_cmdClient cancel];
     [_cmdClient release];
+    [_coverClient cancel];
+    [_coverClient release];
+    [_coverAlbumId release];
     [_lastSnapshot release];
     [_streamURL release];
     [_audioError release];
     [super dealloc];
 }
 
-- (NSTextField *)addLabelAtY:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color
+- (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color
 {
     NSTextField *label = [[[NSTextField alloc]
-        initWithFrame:NSMakeRect(16, y, w, 20)] autorelease];
+        initWithFrame:NSMakeRect(x, y, w, 20)] autorelease];
     [label setEditable:NO];
     [label setSelectable:YES];
     [label setBordered:NO];
@@ -202,6 +214,37 @@
                                         selector:selector] retain];
     [_cmdClient setDelegate:self];
     [_cmdClient start];
+}
+
+// Fetch the 300px cover when the album changes; covers are immutable per
+// album_id, so a single-entry cache (the currently shown album) is enough for
+// now. No blocks / NSCache — both are 10.6+.
+- (void)updateCoverForSnapshot:(DGNowSnapshot *)snap
+{
+    NSString *aid = [snap albumId];
+    if ([aid length] == 0) {
+        if (_coverAlbumId != nil) {
+            [_coverClient cancel];
+            [_coverClient release];
+            _coverClient = nil;
+            [_coverAlbumId release];
+            _coverAlbumId = nil;
+            [_coverView setImage:nil];
+        }
+        return;
+    }
+    if ([aid isEqualToString:_coverAlbumId]) {
+        return;   // already showing (or fetching) this album's cover
+    }
+    [_coverAlbumId release];
+    _coverAlbumId = [aid copy];
+
+    [_coverClient cancel];
+    [_coverClient release];
+    _coverClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+        selector:[NSString stringWithFormat:@"/spot/api/1/cover/%@/300", aid]] retain];
+    [_coverClient setDelegate:self];
+    [_coverClient start];
 }
 
 - (void)onPlayPause:(id)sender
@@ -306,6 +349,19 @@
 
 - (void)dgGopherClient:(DGGopherClient *)client didFinishWithData:(NSData *)data
 {
+    if (client == _coverClient) {
+        // Binary: raw JPEG on success, a tab-KV error document otherwise.
+        [_coverClient release];
+        _coverClient = nil;
+        if ([DGApiParser dataIsJPEG:data]) {
+            NSImage *img = [[[NSImage alloc] initWithData:data] autorelease];
+            [_coverView setImage:img];   // nil-safe if the bytes won't decode
+        } else {
+            [_coverView setImage:nil];   // not_found / bad_range
+        }
+        return;
+    }
+
     NSString *text = [DGApiParser textFromData:data];
 
     if (client == _client || client == _wakeClient || client == _cmdClient) {
@@ -353,6 +409,12 @@
 
 - (void)dgGopherClient:(DGGopherClient *)client didFailWithError:(NSError *)error
 {
+    if (client == _coverClient) {
+        [_coverClient release];
+        _coverClient = nil;
+        [_coverView setImage:nil];   // best-effort; keep _coverAlbumId (no retry spam)
+        return;
+    }
     if (client == _client) {
         [_statusLabel setStringValue:@"offline — retrying"];
         [_client release];
@@ -414,6 +476,7 @@
 - (void)render
 {
     DGNowSnapshot *s = _lastSnapshot;
+    [self updateCoverForSnapshot:s];
     if (s == nil) {
         [_trackLabel setStringValue:@"connecting…"];
         [_artistLabel setStringValue:@""];

@@ -63,4 +63,13 @@
     return (text != nil) ? text : @"";
 }
 
++ (BOOL)dataIsJPEG:(NSData *)data
+{
+    if ([data length] < 2) {
+        return NO;
+    }
+    const unsigned char *b = (const unsigned char *)[data bytes];
+    return (b[0] == 0xFF && b[1] == 0xD8);
+}
+
 @end

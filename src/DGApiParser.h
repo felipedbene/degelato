@@ -31,4 +31,9 @@
 // terminator line (RFC 1436) and invalid byte sequences. Returns @"" on nil.
 + (NSString *)textFromData:(NSData *)data;
 
+// Whether the bytes look like a JPEG (SOI marker FF D8). The /cover endpoint is
+// the one binary response — on success it returns raw JPEG; on error it returns
+// a tab-KV text document, so a client keys off this before decoding an image.
++ (BOOL)dataIsJPEG:(NSData *)data;
+
 @end
