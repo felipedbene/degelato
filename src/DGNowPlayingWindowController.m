@@ -23,6 +23,8 @@
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
 - (void)sendCommand:(NSString *)selector;
 - (void)commitSeek:(NSTimer *)timer;
+- (void)catchUpPoll:(NSTimer *)timer;
+- (DGPlaybackState)effectiveState;
 - (void)updateCoverForSnapshot:(DGNowSnapshot *)snap;
 - (void)render;
 - (void)renderProgress;
@@ -158,15 +160,20 @@
 - (void)startPolling
 {
     [self refresh:nil];
+    NSRunLoop *rl = [NSRunLoop currentRunLoop];
+    // Common modes so the poll keeps running while the user drags a slider or
+    // holds a button (the run loop is in event-tracking mode then).
     if (_pollTimer == nil) {
-        _pollTimer = [[NSTimer scheduledTimerWithTimeInterval:DG_POLL_INTERVAL
-                                                       target:self selector:@selector(pollTick:)
-                                                     userInfo:nil repeats:YES] retain];
+        _pollTimer = [[NSTimer timerWithTimeInterval:DG_POLL_INTERVAL
+                                              target:self selector:@selector(pollTick:)
+                                            userInfo:nil repeats:YES] retain];
+        [rl addTimer:_pollTimer forMode:NSRunLoopCommonModes];
     }
     if (_tickTimer == nil) {
-        _tickTimer = [[NSTimer scheduledTimerWithTimeInterval:DG_TICK_INTERVAL
-                                                       target:self selector:@selector(clockTick:)
-                                                     userInfo:nil repeats:YES] retain];
+        _tickTimer = [[NSTimer timerWithTimeInterval:DG_TICK_INTERVAL
+                                              target:self selector:@selector(clockTick:)
+                                            userInfo:nil repeats:YES] retain];
+        [rl addTimer:_tickTimer forMode:NSRunLoopCommonModes];
     }
 }
 
@@ -181,6 +188,9 @@
     [_seekCommitTimer invalidate];
     [_seekCommitTimer release];
     _seekCommitTimer = nil;
+    [_catchUpTimer invalidate];
+    [_catchUpTimer release];
+    _catchUpTimer = nil;
     [_client cancel];
     [_client release];
     _client = nil;
@@ -223,6 +233,52 @@
                                         selector:selector] retain];
     [_cmdClient setDelegate:self];
     [_cmdClient start];
+
+    // Commands are eventual-consistent (~1-2 s); re-poll /now a couple of times to
+    // bracket that window so the settled state (new track, paused, …) shows fast
+    // instead of waiting for the regular 2 s cycle to happen to land after it
+    // settles. Two polls at ~1.2 s and ~2.4 s straddle the typical settle time.
+    _catchUpsLeft = 2;
+    [_catchUpTimer invalidate];
+    [_catchUpTimer release];
+    _catchUpTimer = [[NSTimer timerWithTimeInterval:1.2
+                                             target:self
+                                           selector:@selector(catchUpPoll:)
+                                           userInfo:nil
+                                            repeats:NO] retain];
+    [[NSRunLoop currentRunLoop] addTimer:_catchUpTimer forMode:NSRunLoopCommonModes];
+}
+
+- (void)catchUpPoll:(NSTimer *)timer
+{
+    [_catchUpTimer release];
+    _catchUpTimer = nil;
+    // Force a fresh /now even if a poll is mid-flight.
+    [_client cancel];
+    [_client release];
+    _client = nil;
+    [self refresh:nil];
+
+    _catchUpsLeft -= 1;
+    if (_catchUpsLeft > 0) {
+        _catchUpTimer = [[NSTimer timerWithTimeInterval:1.2
+                                                 target:self
+                                               selector:@selector(catchUpPoll:)
+                                               userInfo:nil
+                                                repeats:NO] retain];
+        [[NSRunLoop currentRunLoop] addTimer:_catchUpTimer forMode:NSRunLoopCommonModes];
+    }
+}
+
+// The state to display: the optimistic play/pause target during its hold window,
+// else the last snapshot's state. Keeps the transport feeling instant despite the
+// server's eventual consistency.
+- (DGPlaybackState)effectiveState
+{
+    if ([self nowEpochMs] < _stateHoldUntilMs) {
+        return (DGPlaybackState)_intendedState;
+    }
+    return (_lastSnapshot != nil) ? [_lastSnapshot state] : DGPlaybackStopped;
 }
 
 // Fetch the 300px cover when the album changes; covers are immutable per
@@ -258,8 +314,13 @@
 
 - (void)onPlayPause:(id)sender
 {
-    BOOL playing = (_lastSnapshot != nil && [_lastSnapshot state] == DGPlaybackPlaying);
+    BOOL playing = ([self effectiveState] == DGPlaybackPlaying);
+    // Optimistic: flip to the intended state now and hold it past the settle
+    // window, so the button responds instantly instead of looking dead for ~2 s.
+    _intendedState = playing ? DGPlaybackPaused : DGPlaybackPlaying;
+    _stateHoldUntilMs = [self nowEpochMs] + 2500;
     [self sendCommand:(playing ? @"/spot/api/1/pause" : @"/spot/api/1/play")];
+    [self render];
 }
 
 - (void)onPrev:(id)sender { [self sendCommand:@"/spot/api/1/prev"]; }
@@ -286,11 +347,12 @@
     // latches the slider.
     [_seekCommitTimer invalidate];
     [_seekCommitTimer release];
-    _seekCommitTimer = [[NSTimer scheduledTimerWithTimeInterval:0.35
-                                                         target:self
-                                                       selector:@selector(commitSeek:)
-                                                       userInfo:nil
-                                                        repeats:NO] retain];
+    _seekCommitTimer = [[NSTimer timerWithTimeInterval:0.35
+                                                target:self
+                                              selector:@selector(commitSeek:)
+                                              userInfo:nil
+                                               repeats:NO] retain];
+    [[NSRunLoop currentRunLoop] addTimer:_seekCommitTimer forMode:NSRunLoopCommonModes];
 }
 
 - (void)commitSeek:(NSTimer *)timer
@@ -399,8 +461,25 @@
 
     NSString *text = [DGApiParser textFromData:data];
 
-    if (client == _client || client == _wakeClient || client == _cmdClient) {
-        // All of these return a /now snapshot (or an error document).
+    if (client == _cmdClient) {
+        // A command's reply IS a /now snapshot, but Spotify is eventual-consistent
+        // (~1-2 s): right after a pause it can still report "playing", after next
+        // it still reports the old track. Adopting it makes commands look broken
+        // and can flicker the UI, so we DON'T adopt it — we only surface an error.
+        // The catch-up poll scheduled by -sendCommand (plus the 2 s poll) converge
+        // on the settled state, and play/pause is reflected optimistically.
+        NSDictionary *fields = [DGApiParser fieldsFromResponse:text];
+        NSString *errCode = [fields objectForKey:@"error"];
+        [_cmdClient release];
+        _cmdClient = nil;
+        if (errCode != nil) {
+            [_statusLabel setStringValue:[NSString stringWithFormat:@"error: %@", errCode]];
+        }
+        return;
+    }
+
+    if (client == _client || client == _wakeClient) {
+        // The poll (and the Listen-flow wake) carry authoritative /now state.
         NSDictionary *fields = [DGApiParser fieldsFromResponse:text];
         NSString *errCode = [fields objectForKey:@"error"];
         BOOL looksLikeNow = ([fields objectForKey:@"state"] != nil ||
@@ -422,9 +501,8 @@
         // snapshot rather than blanking the display with an all-defaults one.
 
         BOOL wasWake = (client == _wakeClient);
-        if (client == _client)   { [_client release];   _client = nil; }
+        if (client == _client)     { [_client release];     _client = nil; }
         if (client == _wakeClient) { [_wakeClient release]; _wakeClient = nil; }
-        if (client == _cmdClient)  { [_cmdClient release];  _cmdClient = nil; }
 
         if (wasWake && _audioState == DGAudioWaking) {
             [self beginDiscovery];
@@ -541,8 +619,9 @@
         [_albumLabel setStringValue:@""];
     }
 
+    DGPlaybackState eff = [self effectiveState];
     NSString *state;
-    switch ([s state]) {
+    switch (eff) {
         case DGPlaybackPlaying: state = @"playing"; break;
         case DGPlaybackPaused:  state = @"paused";  break;
         default:                state = @"stopped"; break;
@@ -557,7 +636,7 @@
     }
     [_deviceLabel setStringValue:[NSString stringWithFormat:@"device   %@", device]];
 
-    [_playPauseButton setTitle:([s state] == DGPlaybackPlaying ? @"Pause" : @"Play")];
+    [_playPauseButton setTitle:(eff == DGPlaybackPlaying ? @"Pause" : @"Play")];
 
     // Don't reconcile the volume slider while the user's just-set value is still
     // settling on the server (see onVolume:).

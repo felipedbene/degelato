@@ -22,6 +22,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
 - (void)failWithError:(NSError *)error;
 - (void)teardown;
 - (void)writeRequestIfPossible;
+- (void)closeOutput;
 - (void)drainInput;
 @end
 
@@ -90,17 +91,22 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
 
     [_input setDelegate:self];
     [_output setDelegate:self];
+    // Schedule in the common modes, not just the default mode: while the user is
+    // dragging a slider, holding a button, or tracking a menu, the run loop runs
+    // in NSEventTrackingRunLoopMode and a default-mode-only stream would stall
+    // until the interaction ends — a stalled poll then times out as "offline".
     NSRunLoop *rl = [NSRunLoop currentRunLoop];
-    [_input scheduleInRunLoop:rl forMode:NSDefaultRunLoopMode];
-    [_output scheduleInRunLoop:rl forMode:NSDefaultRunLoopMode];
+    [_input scheduleInRunLoop:rl forMode:NSRunLoopCommonModes];
+    [_output scheduleInRunLoop:rl forMode:NSRunLoopCommonModes];
     [_input open];
     [_output open];
 
-    _timeout = [[NSTimer scheduledTimerWithTimeInterval:DG_TIMEOUT_SECONDS
-                                                 target:self
-                                               selector:@selector(timeoutFired:)
-                                               userInfo:nil
-                                                repeats:NO] retain];
+    _timeout = [[NSTimer timerWithTimeInterval:DG_TIMEOUT_SECONDS
+                                        target:self
+                                      selector:@selector(timeoutFired:)
+                                      userInfo:nil
+                                       repeats:NO] retain];
+    [rl addTimer:_timeout forMode:NSRunLoopCommonModes];
 }
 
 - (void)cancel
@@ -145,6 +151,13 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
             break;
 
         case NSStreamEventErrorOccurred: {
+            // Only the input stream is authoritative for completion. Once the
+            // selector is written we drop the output stream, but a real connect
+            // failure surfaces on the input stream too — so ignore output-side
+            // errors (the peer closing its read end after responding is normal).
+            if (stream != _input) {
+                break;
+            }
             NSError *err = [stream streamError];
             if (err == nil) {
                 err = DGMakeError(DGGopherErrorStream, @"The connection failed.");
@@ -176,7 +189,21 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     }
     if (_reqOffset >= len) {
         _wroteRequest = YES;   // selector sent; now just read to EOF
+        [self closeOutput];    // done writing — drop the output stream so its
+                               // later close/error events can't fail the request
     }
+}
+
+- (void)closeOutput
+{
+    if (_output == nil) {
+        return;
+    }
+    [_output setDelegate:nil];
+    [_output removeFromRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+    [_output close];
+    [_output release];
+    _output = nil;
 }
 
 - (void)drainInput
@@ -229,14 +256,14 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     NSRunLoop *rl = [NSRunLoop currentRunLoop];
     if (_input != nil) {
         [_input setDelegate:nil];
-        [_input removeFromRunLoop:rl forMode:NSDefaultRunLoopMode];
+        [_input removeFromRunLoop:rl forMode:NSRunLoopCommonModes];
         [_input close];
         [_input release];
         _input = nil;
     }
     if (_output != nil) {
         [_output setDelegate:nil];
-        [_output removeFromRunLoop:rl forMode:NSDefaultRunLoopMode];
+        [_output removeFromRunLoop:rl forMode:NSRunLoopCommonModes];
         [_output close];
         [_output release];
         _output = nil;

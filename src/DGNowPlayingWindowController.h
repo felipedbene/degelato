@@ -65,6 +65,11 @@ typedef enum {
     long long        _volumeHoldUntilMs; // ditto for the volume slider (eventual consistency)
     BOOL             _online;            // last /now poll succeeded — freeze interpolation when NO
 
+    NSInteger        _intendedState;     // optimistic play/pause target (a DGPlaybackState)
+    long long        _stateHoldUntilMs;  // show _intendedState until this epoch-ms
+    NSTimer         *_catchUpTimer;      // fast re-poll after a command settles
+    NSInteger        _catchUpsLeft;      // remaining catch-up polls (brackets settle)
+
     DGAudioStreamer *_streamer;
     NSString        *_streamURL;
     DGAudioUIState   _audioState;
