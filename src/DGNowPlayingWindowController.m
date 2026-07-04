@@ -8,6 +8,7 @@
 #import "DGNowSnapshot.h"
 #import "DGPLSParser.h"
 #import "DGFontManager.h"
+#import "DGSnapshotGuard.h"
 
 #define DG_HOST          @"10.0.100.112"
 #define DG_PORT          70
@@ -105,6 +106,7 @@
         _refreshButton = [self addButtonWithFrame:NSMakeRect(372, 8, 92, 30)
                                             title:@"Refresh" action:@selector(refresh:)];
 
+        _snapGuard = [[DGSnapshotGuard alloc] init];
         _audioState = DGAudioIdle;
         [self render];
         [self renderAudio];
@@ -123,6 +125,7 @@
     [_coverClient release];
     [_coverAlbumId release];
     [_lastSnapshot release];
+    [_snapGuard release];
     [_streamURL release];
     [_audioError release];
     [super dealloc];
@@ -502,11 +505,21 @@
             _online = NO;   // no fresh state — freeze the clock instead of racing to 100%
         } else if (looksLikeNow) {
             DGNowSnapshot *snap = [DGApiParser snapshotFromFields:fields];
-            [_lastSnapshot release];
-            _lastSnapshot = [snap retain];
+            // Reconnect after an outage: the backend may have restarted with a
+            // reset clock, so forget the high-water mark before adopting the
+            // first fresh snapshot (else a lower ts would be rejected forever).
+            if (!_online) {
+                [_snapGuard reset];
+            }
             _online = YES;
             [_statusLabel setStringValue:@""];
-            [self render];
+            // Drop out-of-order /now from a staler replica (two load-balanced
+            // pods, ~1 s micro-cache each) — adopting it rewinds the UI (R3).
+            if ([_snapGuard acceptTs:[snap ts]]) {
+                [_lastSnapshot release];
+                _lastSnapshot = [snap retain];
+                [self render];
+            }
         }
         // else: a bodyless / ack reply carrying no /now fields — keep the last
         // snapshot rather than blanking the display with an all-defaults one.

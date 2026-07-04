@@ -19,6 +19,7 @@
 #import "DGAudioStreamer.h"
 
 @class DGNowSnapshot;
+@class DGSnapshotGuard;
 
 typedef enum {
     DGAudioIdle = 0,
@@ -59,6 +60,7 @@ typedef enum {
     DGGopherClient  *_coverClient;  // in-flight /cover fetch
     NSString        *_coverAlbumId; // album_id of the cover currently shown/fetching
     DGNowSnapshot   *_lastSnapshot;
+    DGSnapshotGuard *_snapGuard;    // drops out-of-order /now from a staler replica
 
     NSTimer         *_seekCommitTimer;   // debounce: commit a seek after the drag settles
     long long        _seekHoldUntilMs;   // don't reconcile the seek slider until this epoch-ms
