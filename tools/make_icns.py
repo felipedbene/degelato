@@ -4,7 +4,7 @@
 import struct, io, sys
 from PIL import Image, ImageDraw
 
-SRC = "design/icon/degelato-icon-glossy.png"
+SRC = "design/icon/degelato-icon-headphones.png"
 OUT = "Resources/DeGelato.icns"
 
 src = Image.open(SRC).convert("RGBA")
