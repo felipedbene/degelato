@@ -28,6 +28,12 @@ These are load-bearing. Full write-up in `design/INVESTIGATION-command-spam.md`.
   ~2 % to ~100 % success. **Do not migrate back to CFStream-by-hostname.** All
   client results are marshalled to the main thread; zero shared mutable state
   (the PPC 970's weak memory model must never become relevant).
+  - **fio 20 refinement:** the client uses plain `getaddrinfo` (NO
+    `AI_NUMERICHOST`). A numeric literal (the spot host) still resolves instantly
+    with no DNS query, but a real HOSTNAME — needed by the gopher browser
+    (gopher.debene.dev, …) — now resolves via the normal libc DNS path (nc's
+    path), still never CFHost/mDNS. Keep it this way: `AI_NUMERICHOST` would break
+    browsing, dropping it does not reintroduce R7 (that was CFHost, not getaddrinfo).
 
 ## Done
 - **Audio (Fio 2):** `DGAudioStreamer` = AudioFileStream → AudioQueue against the

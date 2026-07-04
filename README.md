@@ -61,6 +61,32 @@ Queue (fio 6):
 - **Add to Queue** in the search window enqueues the selected result with
   `/spot/api/1/queue/add?<uri>` (there is no queue/clear in v1 — add only).
 
+### DeToca parity campaign (fios 14–22)
+
+A second campaign brought DeGelato to feature parity with its Snow Leopard
+sibling [DeToca](https://github.com/felipedbene/detoca). See
+`design/PARITY-audit.md` for the full DeToca × DeGelato matrix.
+
+- **Preferences (⌘,)** — the gopher-spot server address is now a saved
+  preference (`DGServerPrefs`), not a hardcoded constant. Host/port with live
+  validation, a non-blocking **Test Connection** (round-trip latency), and a
+  Save that reconnects the radinho.
+- **Cover cache** — a two-level (memory + disk) cover-bytes cache
+  (`DGCoverCache`, `~/Library/Caches/…/covers/`) so revisiting an album is free
+  and the list can show thumbnails.
+- **Library window (⌘F / ⌘U / ⌘Y)** — one segmented window in three modes:
+  **Busca** (search → play / add), **Fila** (live up-next, refreshed off the
+  poll), **Playlists** (all playlists → **context play**). Rows are 64px
+  thumbnail cells.
+- **Media keys (⏮ ⏯ ⏭)** — global capture via a Quartz event tap
+  (`DGMediaKeyTap`); needs *Universal Access ▸ assistive devices* on 10.5.
+- **Gopher browser** — a general RFC 1436 client: **Gopher ▸ Home (⌘⇧H)** and
+  **Open Location (⌘L)** open cascaded windows; menus render as a typed-row
+  table (double-click to follow), type-0 documents render with full **ANSI
+  256-color / truecolor** styling (braille maps aligned via Cascadia Code).
+  Type-7 search prompts for a query; **bookmarks** (Add ⌘D / Show) live in a
+  hand-editable gophermap under `~/Library/Application Support/DeGelato/`.
+
 ## Requirements
 
 - **Build host: the G5 itself.** Sorbet Leopard 10.5.x, Xcode 3.1.4, GCC 4.2.
