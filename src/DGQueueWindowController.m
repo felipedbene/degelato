@@ -7,9 +7,8 @@
 #import "DGApiParser.h"
 #import "DGTrackItem.h"
 #import "DGFontManager.h"
+#import "DGServerPrefs.h"
 
-#define DG_HOST @"10.0.100.112"
-#define DG_PORT 70
 
 @interface DGQueueWindowController ()
 - (NSString *)clockFromMs:(long long)ms;
@@ -123,7 +122,7 @@
 {
     [_queueClient cancel];
     [_queueClient release];
-    _queueClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _queueClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
                                           selector:@"/spot/api/1/queue"] retain];
     [_queueClient setDelegate:self];
     [_statusLabel setStringValue:@"loading…"];

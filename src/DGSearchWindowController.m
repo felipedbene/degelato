@@ -7,9 +7,8 @@
 #import "DGApiParser.h"
 #import "DGTrackItem.h"
 #import "DGFontManager.h"
+#import "DGServerPrefs.h"
 
-#define DG_HOST @"10.0.100.112"
-#define DG_PORT 70
 
 // Percent-escape a string for use as a gopher selector query value: escape the
 // gopher/query delimiters and all UTF-8 high bytes, so an arbitrary search string
@@ -142,7 +141,7 @@ static NSString *DGPercentEscape(NSString *s)
     }
     [_searchClient cancel];
     [_searchClient release];
-    _searchClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _searchClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
         selector:[NSString stringWithFormat:@"/spot/api/1/search?q=%@", DGPercentEscape(q)]] retain];
     [_searchClient setDelegate:self];
     [_statusLabel setStringValue:@"searching…"];
@@ -161,7 +160,7 @@ static NSString *DGPercentEscape(NSString *s)
     }
     [_playClient cancel];
     [_playClient release];
-    _playClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _playClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
         selector:[NSString stringWithFormat:@"/spot/play?uri=%@", DGPercentEscape(item.uri)]] retain];
     [_playClient setDelegate:self];
     [_statusLabel setStringValue:[NSString stringWithFormat:@"playing  %@ — %@",
@@ -182,7 +181,7 @@ static NSString *DGPercentEscape(NSString *s)
     }
     [_queueClient cancel];
     [_queueClient release];
-    _queueClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _queueClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
         selector:[NSString stringWithFormat:@"/spot/api/1/queue/add?%@", DGPercentEscape(item.uri)]] retain];
     [_queueClient setDelegate:self];
     [_statusLabel setStringValue:[NSString stringWithFormat:@"queued  %@ — %@",

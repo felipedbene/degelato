@@ -41,7 +41,8 @@ MODEL_SRC = \
 	src/DGPLSParser.m \
 	src/DGTrackItem.m \
 	src/DGSnapshotGuard.m \
-	src/DGDebouncer.m
+	src/DGDebouncer.m \
+	src/DGServerPrefs.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -58,6 +59,7 @@ UI_SRC = \
 	src/DGNowPlayingWindowController.m \
 	src/DGSearchWindowController.m \
 	src/DGQueueWindowController.m \
+	src/DGPreferencesController.m \
 	src/AppDelegate.m \
 	src/main.m
 
@@ -111,7 +113,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGTrackItemTests.m \
            tests/DGSnapshotGuardTests.m \
            tests/DGDebouncerTests.m \
-           tests/DGTimelineTests.m
+           tests/DGTimelineTests.m \
+           tests/DGServerPrefsTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"

@@ -5,3 +5,6 @@ build/
 *.o
 *.dmg
 dmg-stage/
+
+# Working campaign spec — not part of the project
+PROMPT.md

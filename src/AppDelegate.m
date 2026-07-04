@@ -7,11 +7,13 @@
 #import "DGNowPlayingWindowController.h"
 #import "DGSearchWindowController.h"
 #import "DGQueueWindowController.h"
+#import "DGPreferencesController.h"
 
 @interface AppDelegate ()
 - (void)buildMenuBar;
 - (void)openSearch:(id)sender;
 - (void)openQueue:(id)sender;
+- (void)showPreferences:(id)sender;
 - (void)wakeDevice:(id)sender;
 @end
 
@@ -55,6 +57,15 @@
     [[_queue window] makeKeyAndOrderFront:self];
 }
 
+- (void)showPreferences:(id)sender
+{
+    if (_prefs == nil) {
+        _prefs = [[DGPreferencesController alloc] init];
+    }
+    [_prefs showWindow:self];
+    [[_prefs window] makeKeyAndOrderFront:self];
+}
+
 // Wake without changing play/pause state; forwarded to the now-playing window,
 // which owns the gopher command path and adopts the returned /now.
 - (void)wakeDevice:(id)sender
@@ -67,6 +78,7 @@
     [_nowPlaying release];
     [_search release];
     [_queue release];
+    [_prefs release];
     [super dealloc];
 }
 
@@ -84,6 +96,10 @@
     [appMenu addItemWithTitle:@"About DeGelato"
                        action:@selector(orderFrontStandardAboutPanel:)
                 keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [[appMenu addItemWithTitle:@"Preferences…"
+                        action:@selector(showPreferences:)
+                 keyEquivalent:@","] setTarget:self];
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"Hide DeGelato"
                        action:@selector(hide:)

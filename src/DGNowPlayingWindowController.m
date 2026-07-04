@@ -10,9 +10,8 @@
 #import "DGFontManager.h"
 #import "DGSnapshotGuard.h"
 #import "DGDebouncer.h"
+#import "DGServerPrefs.h"
 
-#define DG_HOST          @"10.0.100.112"
-#define DG_PORT          70
 #define DG_SELECTOR      @"/spot/api/1/now"
 #define DG_PLS_SELECTOR  @"/spot/stream.pls"
 #define DG_WAKE_SELECTOR @"/spot/api/1/wake?play=1"
@@ -24,6 +23,7 @@
 - (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
 - (void)sendCommand:(NSString *)selector;
+- (void)serverPrefsDidChange:(NSNotification *)note;
 - (void)debounceTransport:(NSString *)selector;
 - (void)fireTransport:(NSTimer *)timer;
 - (void)commitSeek:(NSTimer *)timer;
@@ -112,6 +112,9 @@
 
         _snapGuard = [[DGSnapshotGuard alloc] init];
         _transportDebouncer = [[DGDebouncer alloc] init];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+            selector:@selector(serverPrefsDidChange:)
+                name:DGServerPrefsDidChangeNotification object:nil];
         _audioState = DGAudioIdle;
         [self render];
         [self renderAudio];
@@ -122,6 +125,7 @@
 
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stopPolling];
     [self stopAudio];
     [_cmdClient cancel];
@@ -233,10 +237,28 @@
         [_client release];
         _client = nil;
     }
-    _client = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _client = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
                                      selector:DG_SELECTOR] retain];
     [_client setDelegate:self];
     [_client start];
+}
+
+// The Preferences window saved a new backend address: drop the in-flight poll,
+// forget the ts high-water mark (a different server has an unrelated clock),
+// clear the stale snapshot, and reconnect. Every request already reads the new
+// host/port from DGServerPrefs at call time.
+- (void)serverPrefsDidChange:(NSNotification *)note
+{
+    [_client cancel];
+    [_client release];
+    _client = nil;
+    [_snapGuard reset];
+    _online = NO;
+    [_lastSnapshot release];
+    _lastSnapshot = nil;
+    [_statusLabel setStringValue:@"reconnecting…"];
+    [self render];
+    [self refresh:nil];
 }
 
 #pragma mark - Transport (fio 3)
@@ -250,7 +272,7 @@
         [_cmdClient release];
         _cmdClient = nil;
     }
-    _cmdClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _cmdClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
                                         selector:selector] retain];
     [_cmdClient setDelegate:self];
     [_cmdClient start];
@@ -328,7 +350,7 @@
 
     [_coverClient cancel];
     [_coverClient release];
-    _coverClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _coverClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
         selector:[NSString stringWithFormat:@"/spot/api/1/cover/%@/300", aid]] retain];
     [_coverClient setDelegate:self];
     [_coverClient start];
@@ -472,7 +494,7 @@
     if (_lastSnapshot != nil && [_lastSnapshot deviceIsIdle]) {
         _audioState = DGAudioWaking;
         [self renderAudio];
-        _wakeClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+        _wakeClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
                                              selector:DG_WAKE_SELECTOR] retain];
         [_wakeClient setDelegate:self];
         [_wakeClient start];
@@ -485,7 +507,7 @@
 {
     _audioState = DGAudioDiscovering;
     [self renderAudio];
-    _plsClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+    _plsClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
                                         selector:DG_PLS_SELECTOR] retain];
     [_plsClient setDelegate:self];
     [_plsClient start];

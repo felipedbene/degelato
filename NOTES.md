@@ -71,20 +71,24 @@ These are load-bearing. Full write-up in `design/INVESTIGATION-command-spam.md`.
   The queue window doesn't auto-refresh after an add elsewhere — press Refresh
   (cross-window notification wasn't worth it for one action).
 
-## Deferred to later fios
-- **Queue thumbnails / live refresh:** the queue table is text-only and refreshes
-  on open / Refresh. Cover thumbnails per row need the deferred multi-entry cover
-  cache; a periodic poll could keep "up next" live as tracks advance.
-- **Eventual consistency:** a command's returned `/now` can lag Spotify by
-  ~1–2 s (verified: firing pause→play back-to-back, each reply showed the
-  previous state). The UI adopts the reply optimistically; the 2 s poll
-  reconciles. A monotonic-ts guard (like DeToca's DTSnapshotGuard) would stop a
-  staler replica from rewinding the UI — worth adding if two pods ever disagree.
-- **Cover disk cache:** Fio 4 keeps only a single in-memory entry (the current
-  album's NSImage), keyed by `album_id`, refetched on album change. DeToca's
-  DTCoverCache (two-level, disk-backed, block-based, NSCache) is deferred — NSCache
-  is 10.6+ and we don't yet need many thumbnails. Add a plain NSMutableDictionary
-  + on-disk store when the playlist window (many 64px thumbs) lands.
+## Shipped since (fios 8–15) — reconciling the deferrals below
+- **Eventual-consistency / staler-replica rewind → DONE (fio 9).** The monotonic
+  ts-guard shipped as `DGSnapshotGuard`; two pods *do* disagree and it is now
+  mandatory (see the design-constraints section above).
+- **BSD-socket client, unified hold, transport debounce, cancel-and-replace polls →
+  DONE (fios 8/10/12).** The "Deferred" notes below predate this; where they
+  describe those as future work, treat the design-constraints section + the
+  investigation doc as authoritative.
+- **Configurable server address → DONE (fio 15).** `DGServerPrefs` +
+  Preferences window (⌘,) replaced the hardcoded `DG_HOST`/`DG_PORT`.
+
+## Deferred to later fios (parity campaign, fios 16+)
+- **Cover disk cache → fio 16 (next).** Today a single in-memory entry keyed by
+  `album_id`. Port DeToca's `DTCoverCache` as a plain `NSMutableDictionary` +
+  on-disk store (NO NSCache — 10.6+; NO block fetcher — use a delegate). Unblocks
+  the 64px thumbnails.
+- **Queue thumbnails / live "up next" → fios 17–18.** Text-only + manual Refresh
+  today; the unified 3-mode list window and a poll-driven queue refresh land there.
 - **Audio pause:** transport pause stops Spotify; the local stream keeps buffering
   silence. Could `AudioQueuePause` the streamer in sympathy, but the pipe is live
   radio — simplest to leave it and let Listen/Stop own the local side.

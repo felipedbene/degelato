@@ -92,7 +92,6 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     }
     _running = YES;
     _done = NO;
-    _wroteRequest = NO;
 
     // Belt-and-suspenders deadline on the main thread: even if a worker wedges
     // in a syscall, the transaction still fails and polling continues. The

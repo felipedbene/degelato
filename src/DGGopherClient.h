@@ -1,17 +1,20 @@
 //
 //  DGGopherClient.h
-//  DeGelato — fio 1
+//  DeGelato — fio 1; gopher client rewritten in fio 8 (see .m)
 //
-//  One RFC 1436 gopher transaction over a run-loop-scheduled NSStream pair:
-//  connect to host:port, write "selector\r\n", accumulate the response to EOF,
-//  then hand the raw bytes to the delegate. 10.5 has no GCD/blocks, so this is
-//  deliberately delegate-driven on the current run loop (NSDefaultRunLoopMode) —
-//  it is the DeGelato counterpart to DeToca's blocking-socket GopherRequest.
+//  One RFC 1436 gopher transaction: connect to host:port, write "selector\r\n",
+//  read the response to EOF, hand the raw bytes to the delegate on the MAIN
+//  thread. The implementation runs the transaction on a dedicated BSD-socket
+//  worker thread (getaddrinfo + connect, the path nc uses) rather than CFStream
+//  — CFStream/CFHost stalled intermittently on 10.5 (R7; see the .m and
+//  design/INVESTIGATION-command-spam.md). It is DeGelato's counterpart to
+//  DeToca's GopherRequest.
 //
 //  One request at a time per instance. The receiver retains itself for the
 //  duration of a request (like NSURLConnection), so callers may release their
-//  reference right after -start. A 10s NSTimer bounds the whole transaction.
-//  -cancel is safe at any point, including mid-flight from -dealloc.
+//  reference right after -start. A main-thread watchdog bounds the whole
+//  transaction; the worker also self-bounds connect + read. -cancel is safe at
+//  any point, including mid-flight from -dealloc (it can't un-send a command).
 //
 
 #import <Foundation/Foundation.h>
@@ -26,9 +29,9 @@
 extern NSString * const DGGopherErrorDomain;
 
 enum {
-    DGGopherErrorConnect = 1,   // stream could not be created / opened
+    DGGopherErrorConnect = 1,   // socket could not be created / connected
     DGGopherErrorTimeout = 2,   // whole transaction exceeded the deadline
-    DGGopherErrorStream  = 3    // NSStreamEventErrorOccurred while in flight
+    DGGopherErrorStream  = 3    // read/write error while in flight
 };
 
 @interface DGGopherClient : NSObject {
@@ -37,15 +40,9 @@ enum {
     NSString *_selector;
     id <DGGopherClientDelegate> _delegate;   // not retained
 
-    NSInputStream  *_input;
-    NSOutputStream *_output;
-    NSMutableData  *_buffer;     // accumulated response bytes
-    NSData         *_request;    // "selector\r\n" as UTF-8, for partial writes
-    NSUInteger      _reqOffset;  // bytes of _request already written
-    NSTimer        *_timeout;
+    NSTimer *_timeout;           // main-thread transaction watchdog
 
     BOOL _running;
-    BOOL _wroteRequest;
     BOOL _done;                  // guards single didFinish/didFail delivery
 }
 
