@@ -31,7 +31,8 @@
 {
     NSRect frame = NSMakeRect(0, 0, DG_GOPHER_W, DG_GOPHER_H);
     NSUInteger style = (NSTitledWindowMask | NSClosableWindowMask |
-                        NSMiniaturizableWindowMask | NSResizableWindowMask);
+                        NSMiniaturizableWindowMask | NSResizableWindowMask |
+                        NSTexturedBackgroundWindowMask);
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
                                                      backing:NSBackingStoreBuffered

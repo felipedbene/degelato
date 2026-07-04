@@ -63,7 +63,8 @@ static NSString *DGEscapeURI(NSString *s)
 {
     NSRect frame = NSMakeRect(0, 0, 560, 470);
     NSUInteger style = NSTitledWindowMask | NSClosableWindowMask |
-                       NSMiniaturizableWindowMask | NSResizableWindowMask;
+                       NSMiniaturizableWindowMask | NSResizableWindowMask |
+                       NSTexturedBackgroundWindowMask;
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
                                                      backing:NSBackingStoreBuffered
@@ -95,7 +96,7 @@ static NSString *DGEscapeURI(NSString *s)
         [c addSubview:_queryField];
 
         _searchButton = [[[NSButton alloc] initWithFrame:NSMakeRect(476, 399, 68, 28)] autorelease];
-        [_searchButton setBezelStyle:NSRoundedBezelStyle];
+        [_searchButton setBezelStyle:NSTexturedRoundedBezelStyle];
         [_searchButton setTitle:@"Search"];
         [_searchButton setTarget:self];
         [_searchButton setAction:@selector(doSearch:)];
@@ -126,7 +127,7 @@ static NSString *DGEscapeURI(NSString *s)
         [c addSubview:scroll];
 
         _addButton = [[[NSButton alloc] initWithFrame:NSMakeRect(16, 8, 120, 28)] autorelease];
-        [_addButton setBezelStyle:NSRoundedBezelStyle];
+        [_addButton setBezelStyle:NSTexturedRoundedBezelStyle];
         [_addButton setTitle:@"Add to Queue"];
         [_addButton setTarget:self];
         [_addButton setAction:@selector(addSelected:)];
@@ -134,7 +135,7 @@ static NSString *DGEscapeURI(NSString *s)
         [c addSubview:_addButton];
 
         _refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(456, 8, 88, 28)] autorelease];
-        [_refreshButton setBezelStyle:NSRoundedBezelStyle];
+        [_refreshButton setBezelStyle:NSTexturedRoundedBezelStyle];
         [_refreshButton setTitle:@"Refresh"];
         [_refreshButton setTarget:self];
         [_refreshButton setAction:@selector(refresh:)];

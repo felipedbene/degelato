@@ -27,7 +27,8 @@
 - (id)init
 {
     NSRect frame = NSMakeRect(0, 0, 420, 190);
-    NSUInteger style = NSTitledWindowMask | NSClosableWindowMask;
+    NSUInteger style = NSTitledWindowMask | NSClosableWindowMask |
+                       NSTexturedBackgroundWindowMask;
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
                                                      backing:NSBackingStoreBuffered
@@ -53,7 +54,7 @@
         _portField = [self addFieldAtX:84 y:86 width:80];
 
         _testButton = [[[NSButton alloc] initWithFrame:NSMakeRect(174, 84, 130, 26)] autorelease];
-        [_testButton setBezelStyle:NSRoundedBezelStyle];
+        [_testButton setBezelStyle:NSTexturedRoundedBezelStyle];
         [_testButton setTitle:@"Test Connection"];
         [_testButton setTarget:self];
         [_testButton setAction:@selector(onTest:)];
@@ -63,7 +64,7 @@
                                    color:[NSColor grayColor]];
 
         _saveButton = [[[NSButton alloc] initWithFrame:NSMakeRect(316, 12, 88, 30)] autorelease];
-        [_saveButton setBezelStyle:NSRoundedBezelStyle];
+        [_saveButton setBezelStyle:NSTexturedRoundedBezelStyle];
         [_saveButton setTitle:@"Save"];
         [_saveButton setKeyEquivalent:@"\r"];   // Enter saves
         [_saveButton setTarget:self];
@@ -71,7 +72,7 @@
         [[window contentView] addSubview:_saveButton];
 
         NSButton *cancel = [[[NSButton alloc] initWithFrame:NSMakeRect(220, 12, 88, 30)] autorelease];
-        [cancel setBezelStyle:NSRoundedBezelStyle];
+        [cancel setBezelStyle:NSTexturedRoundedBezelStyle];
         [cancel setTitle:@"Cancel"];
         [cancel setKeyEquivalent:@"\033"];      // Esc cancels
         [cancel setTarget:self];

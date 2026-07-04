@@ -50,7 +50,8 @@ NSString * const DGNowTrackDidChangeNotification = @"DGNowTrackDidChangeNotifica
 - (id)init
 {
     NSRect frame = NSMakeRect(0, 0, 480, 360);
-    NSUInteger style = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask;
+    NSUInteger style = NSTitledWindowMask | NSClosableWindowMask |
+                       NSMiniaturizableWindowMask | NSTexturedBackgroundWindowMask;
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
                                                      backing:NSBackingStoreBuffered
@@ -166,7 +167,7 @@ NSString * const DGNowTrackDidChangeNotification = @"DGNowTrackDidChangeNotifica
 - (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action
 {
     NSButton *b = [[[NSButton alloc] initWithFrame:frame] autorelease];
-    [b setBezelStyle:NSRoundedBezelStyle];
+    [b setBezelStyle:NSTexturedRoundedBezelStyle];   // metal / iTunes look
     [b setTitle:title];
     [b setTarget:self];
     [b setAction:action];
