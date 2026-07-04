@@ -5,14 +5,15 @@
 
 #import "AppDelegate.h"
 #import "DGNowPlayingWindowController.h"
-#import "DGSearchWindowController.h"
-#import "DGQueueWindowController.h"
+#import "DGLibraryWindowController.h"
 #import "DGPreferencesController.h"
 
 @interface AppDelegate ()
 - (void)buildMenuBar;
+- (DGLibraryWindowController *)library;
 - (void)openSearch:(id)sender;
 - (void)openQueue:(id)sender;
+- (void)openPlaylists:(id)sender;
 - (void)showPreferences:(id)sender;
 - (void)wakeDevice:(id)sender;
 @end
@@ -39,23 +40,17 @@
     return YES;
 }
 
-- (void)openSearch:(id)sender
+- (DGLibraryWindowController *)library
 {
-    if (_search == nil) {
-        _search = [[DGSearchWindowController alloc] init];
+    if (_library == nil) {
+        _library = [[DGLibraryWindowController alloc] init];
     }
-    [_search showWindow:self];
-    [[_search window] makeKeyAndOrderFront:self];
+    return _library;
 }
 
-- (void)openQueue:(id)sender
-{
-    if (_queue == nil) {
-        _queue = [[DGQueueWindowController alloc] init];
-    }
-    [_queue showWindow:self];   // -showWindow: refreshes the queue
-    [[_queue window] makeKeyAndOrderFront:self];
-}
+- (void)openSearch:(id)sender    { [[self library] showInMode:DGLibraryModeBusca]; }
+- (void)openQueue:(id)sender     { [[self library] showInMode:DGLibraryModeFila]; }
+- (void)openPlaylists:(id)sender { [[self library] showInMode:DGLibraryModePlaylists]; }
 
 - (void)showPreferences:(id)sender
 {
@@ -76,8 +71,7 @@
 - (void)dealloc
 {
     [_nowPlaying release];
-    [_search release];
-    [_queue release];
+    [_library release];
     [_prefs release];
     [super dealloc];
 }
@@ -122,6 +116,9 @@
     [[ctlMenu addItemWithTitle:@"Queue"
                         action:@selector(openQueue:)
                  keyEquivalent:@"u"] setTarget:self];
+    [[ctlMenu addItemWithTitle:@"Playlists"
+                        action:@selector(openPlaylists:)
+                 keyEquivalent:@"y"] setTarget:self];
     [ctlMenu addItem:[NSMenuItem separatorItem]];
     [[ctlMenu addItemWithTitle:@"Wake Device"
                         action:@selector(wakeDevice:)

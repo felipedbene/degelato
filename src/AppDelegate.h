@@ -6,14 +6,12 @@
 #import <Cocoa/Cocoa.h>
 
 @class DGNowPlayingWindowController;
-@class DGSearchWindowController;
-@class DGQueueWindowController;
+@class DGLibraryWindowController;
 @class DGPreferencesController;
 
 @interface AppDelegate : NSObject {
     DGNowPlayingWindowController *_nowPlaying;
-    DGSearchWindowController     *_search;
-    DGQueueWindowController      *_queue;
+    DGLibraryWindowController    *_library;
     DGPreferencesController      *_prefs;
 }
 @end

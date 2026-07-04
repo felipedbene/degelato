@@ -43,7 +43,8 @@ MODEL_SRC = \
 	src/DGSnapshotGuard.m \
 	src/DGDebouncer.m \
 	src/DGServerPrefs.m \
-	src/DGCoverCache.m
+	src/DGCoverCache.m \
+	src/DGPlaylistItem.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -58,8 +59,8 @@ AUDIO_SRC = \
 UI_SRC = \
 	src/DGFontManager.m \
 	src/DGNowPlayingWindowController.m \
-	src/DGSearchWindowController.m \
-	src/DGQueueWindowController.m \
+	src/DGTrackCell.m \
+	src/DGLibraryWindowController.m \
 	src/DGPreferencesController.m \
 	src/AppDelegate.m \
 	src/main.m
@@ -116,7 +117,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGDebouncerTests.m \
            tests/DGTimelineTests.m \
            tests/DGServerPrefsTests.m \
-           tests/DGCoverCacheTests.m
+           tests/DGCoverCacheTests.m \
+           tests/DGPlaylistItemTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"
