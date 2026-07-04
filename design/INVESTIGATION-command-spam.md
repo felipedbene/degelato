@@ -345,6 +345,37 @@ they add no behavior change and can be stripped or kept for the fix pass.
 
 ---
 
+## Fio 8 Step 1 — A/B/C isolation results (measured on the G5)
+
+Metric = `FINISH / START` from the `DG-PROBE` log, per-pid, soaked on the G5.
+Baseline stall signature: `TIMEOUT wrote=0` (connect opened no socket, selector
+never written).
+
+| Arm | Single variable changed | START | FINISH | stalls | success | soak |
+|-----|-------------------------|:-----:|:------:|:------:|:-------:|------|
+| **Baseline** | committed CFStream client | 176 | 4 | 161 | **2%** | 32 min |
+| **Arm A** | do not `-closeOutput` mid-transaction | 23 | 10 | 12 | **45%** | 3 min |
+| **Arm B** | schedule streams in `NSDefaultRunLoopMode` | 26 | 14 | 11 | **56%** | 3 min |
+| **Arm C** | BSD socket, `getaddrinfo(AI_NUMERICHOST)` + `connect()`, **no CFStream/CFHost** | 88 | 87 | **0** | **~100%** | 3 min |
+
+**Conclusion: Arm C is the cause-killer.** `FAIL=0, TIMEOUT=0`; 88 attempts in
+175 s is a clean 2 s poll cadence with zero throttling. Arms A and B each only
+*halved* the stalls because neither touches the connect — the fault is in
+CFStream's **CFHost/mDNS resolution+connect machinery** (a numeric literal still
+routes through CFHost on 10.5 and stalls when mDNSResponder is degraded), which
+is exactly what Arm C bypasses. This confirms the R7 resolver-stall hypothesis
+and matches the `nc` control (libc `getaddrinfo` on a numeric literal → 20/20).
+
+**Fix adopted (fio 8):** the BSD-socket client (Arm C) becomes the production
+`DGGopherClient` — one dedicated worker thread per transaction, results
+marshalled to the main thread via `-performSelectorOnMainThread:` (the sanctioned
+step-3 fallback; pure message-passing, no shared mutable state beyond the `_done`
+completion guard). Plus the Step-2 palliative: the controller's single-flight
+poll guard becomes cancel-and-replace (idempotent read; a slow poll can no longer
+freeze the cadence), and the transaction deadline drops from 10 s toward the LAN.
+
+---
+
 ## Step 4 — Reconstructed timeline
 
 **Scenario:** user scrubs the seek bar for ~3 s (with one mid-scrub dwell), releases, then

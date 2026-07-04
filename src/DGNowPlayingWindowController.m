@@ -210,9 +210,15 @@
 
 - (void)refresh:(id)sender
 {
+    // Cancel-and-replace, not single-flight: /now is an idempotent read, so a
+    // slow in-flight poll must never block a fresh one. The old
+    // `if (_client != nil) return;` guard could latch the UI offline behind one
+    // stalled connect for the whole timeout (R7). Cancel ≠ un-send only matters
+    // for commands (decision #2); dropping a poll is free.
     if (_client != nil) {
-        NSLog(@"DG-PROBE refresh GUARD-HIT _client=%p (skipping)", _client);   // DG-PROBE
-        return;
+        [_client cancel];
+        [_client release];
+        _client = nil;
     }
     _client = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
                                      selector:DG_SELECTOR] retain];
