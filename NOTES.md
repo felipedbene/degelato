@@ -2,12 +2,19 @@
 
 Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
 
+## Done
+- **Audio (Fio 2):** `DGAudioStreamer` = AudioFileStream → AudioQueue against the
+  Icecast MP3, URL discovered from `/spot/stream.pls` (`DGPLSParser`). `wake?play=1`
+  was pulled forward into Play (device-idle handling) rather than waiting for a
+  later fio. NSURLConnection on a dedicated NSThread; no GCD/blocks.
+
 ## Deferred to later fios
-- **Audio (Fio 2):** CFReadStream → AudioFileStream → AudioQueue against
-  `:8000/spotify.mp3`. The risk item; kept out of Fio 1 on purpose.
 - **Transport (Fio 3):** wire the frozen commands (`play`/`pause`/`next`/`prev`/
   `volume?`/`seek?`) — each returns a fresh `/now` snapshot, so the client can
-  reuse the same parse path.
+  reuse the same parse path. API `volume?` + a local volume slider live here too.
+- **Pause vs stop:** Play currently starts/stops the stream outright. A true
+  pause (`AudioQueuePause`, already in DGAudioStreamer) can wire to the transport
+  pause in Fio 3.
 - **Cover art (Fio 4):** `/cover/<album_id>/<size>` — `album_id` is already
   parsed into the snapshot, unused for now.
 - **Wake (Fio 5):** when `device == idle`, offer a wake action; the window

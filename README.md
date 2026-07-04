@@ -6,17 +6,29 @@ A native Cocoa Spotify remote — *the essential Radinho* — for **Sorbet Leopa
 the frozen **gopher-spot machine API `/spot/api/1`** over raw gopher (RFC 1436),
 LAN-only.
 
-**Fio 1** delivers the app skeleton: the gopher socket client, the `/now`
-parser, and a text-only now-playing window. There is no audio yet — that is
-Fio 2, deliberately isolated because it is the risk item.
+**Fio 1** delivered the app skeleton: the gopher socket client, the `/now`
+parser, and a text-only now-playing window. **Fio 2** adds audio — live MP3
+playback of the gopher-spot Icecast stream via CoreAudio.
 
-## What it does (Fio 1)
+## What it does
 
+Now-playing (fio 1):
 - Polls `/spot/api/1/now` every 2 s over a run-loop-scheduled `NSStream`.
 - Shows track / artist / album / playback state / position–duration / volume /
   device in **Cascadia Code**, in a single programmatic window (no NIB).
 - On a network hiccup it shows `offline — retrying`, keeps the last snapshot on
   screen, and recovers silently when the server answers again.
+
+Audio (fio 2):
+- A **Play/Stop** button. On Play it discovers the stream URL from
+  `/spot/stream.pls` (a separate MetalLB LoadBalancer IP, Icecast `:8000`),
+  parses the PLS, and plays the live 128 kbps MP3 with `DGAudioStreamer`
+  (`AudioFileStream` → `AudioQueue`, on a dedicated thread; no GCD/blocks).
+- If `/now` reports `device idle` (playback drifted to another device, so the
+  audio pipe won't carry it), Play first calls `wake?play=1` to pull playback
+  back onto the gopher-spot device, then streams.
+- The `audio` line reports `idle → waking… → connecting… → buffering… →
+  playing`, or an error.
 
 ## Requirements
 
@@ -73,25 +85,29 @@ src/
   DGGopherClient.{h,m}            run-loop NSStream gopher transaction
   DGNowSnapshot.{h,m}            immutable parsed /now snapshot (model)
   DGApiParser.{h,m}             raw text -> fields -> snapshot (pure)
+  DGPLSParser.{h,m}             first stream URL from a PLS/M3U (pure)
+  DGAudioStreamer.{h,m}         live Icecast MP3 via AudioFileStream/AudioQueue
   DGFontManager.{h,m}           resolve Cascadia Code (registered via Info.plist)
-  DGNowPlayingWindowController.{h,m}   the window + 2 s poll loop
+  DGNowPlayingWindowController.{h,m}   window + 2 s poll + Play/Stop audio flow
   AppDelegate.{h,m}, main.m     programmatic app + menu bar
 tests/
   DGApiParserTests.m            parser/model edge cases + on-disk fixtures
   DGGopherClientTests.m         client state machine vs a localhost loopback
-Tests/Fixtures/                 now_live + empty/garbage/truncated/unknown/accents
+  DGPLSParserTests.m            stream-URL extraction (PLS + M3U)
+Tests/Fixtures/                 now_live + degenerate /now + real stream.pls
 Resources/
   Fonts/CascadiaCode-Regular.ttf   bundled font (ATSApplicationFontsPath = Fonts)
   DeGelato.icns, OFL.txt
 ```
 
-## Acceptance (Fio 1)
+## Acceptance (fios 1–2)
 
-- `make` builds ppc/Release-equivalent with **zero warnings** on the G5.
-- `make test` is green — parser edge cases and the client state machine.
-- Launches on Sorbet 10.5 and shows live now-playing within ~3 s.
+- `make` builds ppc with **zero warnings** on the G5.
+- `make test` is green (parser + PLS + client state machine).
+- Launches on Sorbet 10.5, shows live now-playing within ~3 s, and Play streams
+  the live MP3 (verified on the G5: audio pipeline primes and starts in ~2.5 s).
 
-## Not in Fio 1
+## Not yet
 
-Audio (Fio 2), transport controls (Fio 3), cover art (Fio 4), search + wake
-(Fio 5), queue (Fio 6), polish/DMG (Fio 7). No prefs, no TLS, nothing off-LAN.
+Transport controls / API volume (Fio 3), cover art (Fio 4), search (Fio 5),
+queue (Fio 6), polish/DMG (Fio 7). No prefs, no TLS, nothing off-LAN.

@@ -35,12 +35,17 @@ ICON       = Resources/DeGelato.icns
 # Pure Foundation, no AppKit and no gopher. Unit-tested.
 MODEL_SRC = \
 	src/DGNowSnapshot.m \
-	src/DGApiParser.m
+	src/DGApiParser.m \
+	src/DGPLSParser.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
 NET_SRC = \
 	src/DGGopherClient.m
+
+# Audio: live Icecast MP3 via AudioFileStream + AudioQueue (AudioToolbox). fio 2.
+AUDIO_SRC = \
+	src/DGAudioStreamer.m
 
 # AppKit UI. Programmatic window + menu bar.
 UI_SRC = \
@@ -49,8 +54,8 @@ UI_SRC = \
 	src/AppDelegate.m \
 	src/main.m
 
-APP_SRC  = $(MODEL_SRC) $(NET_SRC) $(UI_SRC)
-APP_LIBS = -framework Cocoa -framework CoreFoundation
+APP_SRC  = $(MODEL_SRC) $(NET_SRC) $(AUDIO_SRC) $(UI_SRC)
+APP_LIBS = -framework Cocoa -framework CoreFoundation -framework AudioToolbox
 
 # --- Default target ----------------------------------------------------------
 
@@ -78,7 +83,8 @@ run: $(APP)
 TEST_BUNDLE = Tests.octest
 TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGApiParserTests.m \
-           tests/DGGopherClientTests.m
+           tests/DGGopherClientTests.m \
+           tests/DGPLSParserTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"
