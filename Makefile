@@ -42,7 +42,8 @@ MODEL_SRC = \
 	src/DGTrackItem.m \
 	src/DGSnapshotGuard.m \
 	src/DGDebouncer.m \
-	src/DGServerPrefs.m
+	src/DGServerPrefs.m \
+	src/DGCoverCache.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -114,7 +115,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGSnapshotGuardTests.m \
            tests/DGDebouncerTests.m \
            tests/DGTimelineTests.m \
-           tests/DGServerPrefsTests.m
+           tests/DGServerPrefsTests.m \
+           tests/DGCoverCacheTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"

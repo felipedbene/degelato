@@ -11,6 +11,7 @@
 #import "DGSnapshotGuard.h"
 #import "DGDebouncer.h"
 #import "DGServerPrefs.h"
+#import "DGCoverCache.h"
 
 #define DG_SELECTOR      @"/spot/api/1/now"
 #define DG_PLS_SELECTOR  @"/spot/stream.pls"
@@ -18,6 +19,7 @@
 #define DG_POLL_INTERVAL 2.0
 #define DG_TICK_INTERVAL 1.0
 #define DG_STREAM_VOLUME 1.0f    // loudness is controlled via the API device volume
+#define DG_COVER_SIZE    300     // now-playing cover px (also the cache key size)
 
 @interface DGNowPlayingWindowController ()
 - (NSTextField *)addLabelAtX:(CGFloat)x y:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
@@ -348,10 +350,21 @@
     [_coverAlbumId release];
     _coverAlbumId = [aid copy];
 
+    // Cache hit (memory or disk) → show it instantly, skip the fetch. Revisiting
+    // an album, or a track change back to a recent one, is now free.
+    NSData *cached = [[DGCoverCache sharedCache] coverDataForAlbum:aid size:DG_COVER_SIZE];
+    if ([cached length] > 0) {
+        [_coverClient cancel];
+        [_coverClient release];
+        _coverClient = nil;
+        [_coverView setImage:[[[NSImage alloc] initWithData:cached] autorelease]];
+        return;
+    }
+
     [_coverClient cancel];
     [_coverClient release];
     _coverClient = [[DGGopherClient clientWithHost:[DGServerPrefs host] port:[DGServerPrefs port]
-        selector:[NSString stringWithFormat:@"/spot/api/1/cover/%@/300", aid]] retain];
+        selector:[NSString stringWithFormat:@"/spot/api/1/cover/%@/%d", aid, DG_COVER_SIZE]] retain];
     [_coverClient setDelegate:self];
     [_coverClient start];
 }
@@ -552,6 +565,7 @@
         [_coverClient release];
         _coverClient = nil;
         if ([DGApiParser dataIsJPEG:data]) {
+            [[DGCoverCache sharedCache] storeData:data forAlbum:_coverAlbumId size:DG_COVER_SIZE];
             NSImage *img = [[[NSImage alloc] initWithData:data] autorelease];
             [_coverView setImage:img];   // nil-safe if the bytes won't decode
         } else {
