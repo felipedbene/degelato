@@ -258,11 +258,12 @@
     [_cmdClient setDelegate:self];
     [_cmdClient start];
 
-    // Commands are eventual-consistent (~1-2 s); re-poll /now a couple of times to
-    // bracket that window so the settled state (new track, paused, …) shows fast
-    // instead of waiting for the regular 2 s cycle to happen to land after it
-    // settles. Two polls at ~1.2 s and ~2.4 s straddle the typical settle time.
-    _catchUpsLeft = 2;
+    // Commands are eventual-consistent (~1-2 s); one delayed re-poll at ~1.2 s
+    // surfaces the settled state (new track, paused, …) faster than waiting for
+    // the regular 2 s cycle. The old 2-poll storm (fio 12) is gone: the ts-guard
+    // (fio 9) now drops any out-of-order /now, so extra brackets bought nothing
+    // but load and interleaving.
+    _catchUpsLeft = 1;
     [_catchUpTimer invalidate];
     [_catchUpTimer release];
     _catchUpTimer = [[NSTimer timerWithTimeInterval:1.2
@@ -300,7 +301,7 @@
 // server's eventual consistency.
 - (DGPlaybackState)effectiveState
 {
-    if ([self nowEpochMs] < _stateHoldUntilMs) {
+    if ([self nowEpochMs] < _holdUntilMs) {
         return (DGPlaybackState)_intendedState;
     }
     return (_lastSnapshot != nil) ? [_lastSnapshot state] : DGPlaybackStopped;
@@ -343,7 +344,7 @@
     // Optimistic: flip to the intended state now and hold it past the settle
     // window, so the button responds instantly instead of looking dead for ~2 s.
     _intendedState = playing ? DGPlaybackPaused : DGPlaybackPlaying;
-    _stateHoldUntilMs = [self nowEpochMs] + 2500;
+    _holdUntilMs = [self nowEpochMs] + 2500;
     [self sendCommand:(playing ? @"/spot/api/1/pause" : @"/spot/api/1/play")];
     [self render];
 }
@@ -392,7 +393,7 @@
 
     // Hold reconciliation off the seek slider through the drag AND the command's
     // eventual-consistency window, so the knob doesn't snap back to a stale /now.
-    _seekHoldUntilMs = [self nowEpochMs] + 3000;
+    _holdUntilMs = [self nowEpochMs] + 3000;
 
     // Commit trigger depends on input (DeToca-style, adapted for keyboard):
     //  • mouse: commit ONCE at end-of-tracking (NSLeftMouseUp). No mid-drag
@@ -436,7 +437,7 @@
     }
     long long ms = (long long)([_seekSlider doubleValue] * (double)dur);
     // Extend the hold so the ~1–2 s stale command reply can't rewind the knob.
-    _seekHoldUntilMs = [self nowEpochMs] + 3000;
+    _holdUntilMs = [self nowEpochMs] + 3000;
     [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/seek?%lld", ms]];
 }
 
@@ -453,7 +454,7 @@
     // -setDoubleValue: on the very thumb under the user's finger and yanked it
     // back to the stale server value. Holding through the drag blocks that
     // reconciliation, and the hold also covers the command's settle window.
-    _volumeHoldUntilMs = [self nowEpochMs] + 3000;
+    _holdUntilMs = [self nowEpochMs] + 3000;
 
     // Send once, at end-of-tracking (mouse) or per keypress (keyboard) — not on
     // every drag sample, which would spray /volume commands.
@@ -586,6 +587,14 @@
             if ([_snapGuard acceptTs:[snap ts]]) {
                 [_lastSnapshot release];
                 _lastSnapshot = [snap retain];
+                // Keep the optimistic target in sync with reality whenever we're
+                // NOT inside a hold, so effectiveState returns the real state
+                // during a seek/volume hold (not a stale play/pause target).
+                // Inside the hold we leave _intendedState alone — that's the
+                // optimistic play/pause value the unified hold is protecting.
+                if ([self nowEpochMs] >= _holdUntilMs) {
+                    _intendedState = [snap state];
+                }
                 [self render];
             }
         }
@@ -733,7 +742,7 @@
 
     // Don't reconcile the volume slider while the user's just-set value is still
     // settling on the server (see onVolume:).
-    if ([self nowEpochMs] >= _volumeHoldUntilMs) {
+    if ([self nowEpochMs] >= _holdUntilMs) {
         if ([s hasVolume]) {
             [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)[s volume]]];
             [_volumeSlider setDoubleValue:(double)[s volume]];
@@ -749,7 +758,7 @@
 {
     DGNowSnapshot *s = _lastSnapshot;
     long long now = [self nowEpochMs];
-    BOOL holdSeek = (now < _seekHoldUntilMs);   // user is scrubbing / just sought
+    BOOL holdSeek = (now < _holdUntilMs);   // user is scrubbing / just sought
     if (holdSeek) {
         return;   // leave the knob + time where onSeek: put them
     }

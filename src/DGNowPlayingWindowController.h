@@ -66,14 +66,15 @@ typedef enum {
     NSTimer         *_seekCommitTimer;   // keyboard-only debounce: commit a seek after the arrows settle
     DGDebouncer     *_transportDebouncer; // Prev/Next last-tap-wins coalescer
     NSTimer         *_transportTimer;    // fires the debounced transport command
-    long long        _seekHoldUntilMs;   // don't reconcile the seek slider until this epoch-ms
-    long long        _volumeHoldUntilMs; // ditto for the volume slider (eventual consistency)
     BOOL             _online;            // last /now poll succeeded — freeze interpolation when NO
 
+    // One unified reconciliation hold (fio 12, was three): any user action
+    // (play/pause, seek, volume) suppresses slider/state reconciliation until
+    // this epoch-ms, so the UI adopts server truth atomically, not piecewise.
+    long long        _holdUntilMs;
     NSInteger        _intendedState;     // optimistic play/pause target (a DGPlaybackState)
-    long long        _stateHoldUntilMs;  // show _intendedState until this epoch-ms
-    NSTimer         *_catchUpTimer;      // fast re-poll after a command settles
-    NSInteger        _catchUpsLeft;      // remaining catch-up polls (brackets settle)
+    NSTimer         *_catchUpTimer;      // one delayed re-poll after a command settles
+    NSInteger        _catchUpsLeft;      // remaining catch-up polls
 
     DGAudioStreamer *_streamer;
     NSString        *_streamURL;
