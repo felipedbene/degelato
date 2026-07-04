@@ -3,3 +3,5 @@ Tests.octest/
 .DS_Store
 build/
 *.o
+*.dmg
+dmg-stage/

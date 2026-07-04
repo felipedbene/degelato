@@ -74,8 +74,15 @@ Queue (fio 6):
 make            # build DeGelato.app  (ppc, SDK 10.5, -Wall, zero warnings)
 make run        # build and launch
 make test       # build + run the OCUnit (SenTestingKit) suite, fully offline
+make dmg        # package DeGelato-1.0.dmg (app + Applications symlink)
 make clean
 ```
+
+## Install
+
+Open **DeGelato-1.0.dmg** (from `make dmg`) and drag **DeGelato** onto
+**Applications**. ppc / Sorbet Leopard 10.5 only; the app is LAN-only and needs
+the gopher-spot server reachable at `10.0.100.112:70`.
 
 Defaults live at the top of the `Makefile` (`SDK`, `ARCH=ppc`, `CC=gcc`);
 override on the command line if your SDK is elsewhere.
@@ -145,4 +152,5 @@ Resources/
 
 ## Not yet
 
-Playlists, polish/DMG (Fio 7). No prefs, no TLS, nothing off-LAN.
+Playlists (the machine API lists them, but `/playlists/<id>` tracks are often
+`forbidden` — context play works). No prefs, no TLS, nothing off-LAN.

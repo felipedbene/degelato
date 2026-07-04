@@ -28,7 +28,9 @@ APP        = DeGelato.app
 APP_BINARY = $(APP)/Contents/MacOS/DeGelato
 FONT       = Resources/Fonts/CascadiaCode-Regular.ttf
 LICENSE    = Resources/OFL.txt
+CREDITS    = Resources/Credits.rtf
 ICON       = Resources/DeGelato.icns
+DMG        = DeGelato-1.0.dmg
 
 # --- Source groups -----------------------------------------------------------
 
@@ -66,7 +68,7 @@ all: $(APP)
 
 # --- Application bundle -------------------------------------------------------
 
-$(APP): $(APP_SRC) Info.plist $(FONT) $(ICON)
+$(APP): $(APP_SRC) Info.plist $(FONT) $(ICON) $(CREDITS)
 	@echo "  Assembling $(APP)"
 	@mkdir -p $(APP)/Contents/MacOS
 	@mkdir -p $(APP)/Contents/Resources/Fonts
@@ -75,11 +77,27 @@ $(APP): $(APP_SRC) Info.plist $(FONT) $(ICON)
 	@printf 'APPLGelo' > $(APP)/Contents/PkgInfo
 	@cp $(FONT) $(APP)/Contents/Resources/Fonts/
 	@cp $(ICON) $(APP)/Contents/Resources/
+	@cp $(CREDITS) $(APP)/Contents/Resources/
 	@if [ -f $(LICENSE) ]; then cp $(LICENSE) $(APP)/Contents/Resources/; fi
+	@touch $(APP)                       # nudge Finder's icon cache
 	@echo "  Built $(APP)"
 
 run: $(APP)
 	open $(APP)
+
+# --- Distributable disk image -----------------------------------------------
+
+dmg: $(APP)
+	@echo "  Packaging $(DMG)"
+	@rm -rf dmg-stage "$(DMG)"
+	@mkdir -p dmg-stage
+	@cp -R $(APP) dmg-stage/
+	@ln -s /Applications dmg-stage/Applications
+	@cp README.md dmg-stage/README.txt
+	hdiutil create -volname "DeGelato" -srcfolder dmg-stage \
+		-ov -format UDZO "$(DMG)"
+	@rm -rf dmg-stage
+	@echo "  Built $(DMG)"
 
 # --- OCUnit tests ------------------------------------------------------------
 
@@ -106,6 +124,6 @@ test: $(TEST_SRC) tests/Tests-Info.plist
 # --- Housekeeping ------------------------------------------------------------
 
 clean:
-	rm -rf $(APP) $(TEST_BUNDLE)
+	rm -rf $(APP) $(TEST_BUNDLE) dmg-stage $(DMG)
 
-.PHONY: all run test clean
+.PHONY: all run test dmg clean
