@@ -198,6 +198,7 @@
 
 - (void)pollTick:(NSTimer *)timer
 {
+    NSLog(@"DG-PROBE pollTick _client=%p", _client);   // DG-PROBE
     [self refresh:nil];
 }
 
@@ -210,10 +211,12 @@
 - (void)refresh:(id)sender
 {
     if (_client != nil) {
+        NSLog(@"DG-PROBE refresh GUARD-HIT _client=%p (skipping)", _client);   // DG-PROBE
         return;
     }
     _client = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
                                      selector:DG_SELECTOR] retain];
+    NSLog(@"DG-PROBE refresh created _client=%p", _client);   // DG-PROBE
     [_client setDelegate:self];
     [_client start];
 }
@@ -224,6 +227,7 @@
 {
     // Last press wins: cancel any in-flight command rather than silently
     // dropping the new one, so rapid transport taps stay responsive.
+    NSLog(@"DG-PROBE sendCommand %@ (cancel _cmdClient=%p) _client=%p", selector, _cmdClient, _client);   // DG-PROBE
     if (_cmdClient != nil) {
         [_cmdClient cancel];
         [_cmdClient release];
@@ -254,6 +258,7 @@
     [_catchUpTimer release];
     _catchUpTimer = nil;
     // Force a fresh /now even if a poll is mid-flight.
+    NSLog(@"DG-PROBE catchUpPoll cancel+nil _client=%p left=%ld", _client, (long)_catchUpsLeft);   // DG-PROBE
     [_client cancel];
     [_client release];
     _client = nil;
@@ -501,7 +506,7 @@
         // snapshot rather than blanking the display with an all-defaults one.
 
         BOOL wasWake = (client == _wakeClient);
-        if (client == _client)     { [_client release];     _client = nil; }
+        if (client == _client)     { NSLog(@"DG-PROBE didFinish _client=%p -> nil (looksLikeNow=%d err=%@)", _client, looksLikeNow, errCode); [_client release];     _client = nil; }   // DG-PROBE
         if (client == _wakeClient) { [_wakeClient release]; _wakeClient = nil; }
 
         if (wasWake && _audioState == DGAudioWaking) {
@@ -535,6 +540,7 @@
         return;
     }
     if (client == _client) {
+        NSLog(@"DG-PROBE didFail _client=%p -> nil (%@)", _client, [error localizedDescription]);   // DG-PROBE
         [_statusLabel setStringValue:@"offline — retrying"];
         _online = NO;   // freeze interpolation; keep the last snapshot on screen
         [_client release];

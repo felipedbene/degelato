@@ -64,6 +64,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     _done = NO;
     _wroteRequest = NO;
     _reqOffset = 0;
+    NSLog(@"DG-PROBE client START %p sel=%@", self, _selector);   // DG-PROBE
 
     NSString *line = [(_selector ? _selector : @"") stringByAppendingString:@"\r\n"];
     _request = [[line dataUsingEncoding:NSUTF8StringEncoding] retain];
@@ -111,6 +112,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
 
 - (void)cancel
 {
+    NSLog(@"DG-PROBE client CANCEL %p sel=%@ running=%d done=%d wrote=%d", self, _selector, _running, _done, _wroteRequest);   // DG-PROBE
     if (!_running) {
         return;
     }
@@ -120,6 +122,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
 
 - (void)timeoutFired:(NSTimer *)timer
 {
+    NSLog(@"DG-PROBE client TIMEOUT %p sel=%@ wrote=%d", self, _selector, _wroteRequest);   // DG-PROBE
     [self failWithError:DGMakeError(DGGopherErrorTimeout,
         [NSString stringWithFormat:@"Timed out talking to %@:%ld.",
             _host, (long)_port])];
@@ -145,6 +148,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         case NSStreamEventEndEncountered:
             if (stream == _input) {
                 // Clean EOF: the server has sent the whole response.
+                NSLog(@"DG-PROBE client EOF %p sel=%@ buffered=%lu", self, _selector, (unsigned long)[_buffer length]);   // DG-PROBE
                 [self drainInput];   // grab anything buffered before EOF
                 [self finishWithData:[[_buffer retain] autorelease]];
             }
@@ -189,6 +193,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     }
     if (_reqOffset >= len) {
         _wroteRequest = YES;   // selector sent; now just read to EOF
+        NSLog(@"DG-PROBE client WROTE %p sel=%@", self, _selector);   // DG-PROBE
         [self closeOutput];    // done writing — drop the output stream so its
                                // later close/error events can't fail the request
     }
@@ -227,6 +232,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         return;
     }
     _done = YES;
+    NSLog(@"DG-PROBE client FINISH %p sel=%@ bytes=%lu delegate=%p", self, _selector, (unsigned long)[data length], _delegate);   // DG-PROBE
     // Keep ourselves alive across the callback + teardown in case the delegate
     // releases its last reference to us from within the callback.
     [[self retain] autorelease];
@@ -241,6 +247,7 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
         return;
     }
     _done = YES;
+    NSLog(@"DG-PROBE client FAIL %p sel=%@ err=%@ delegate=%p", self, _selector, [error localizedDescription], _delegate);   // DG-PROBE
     [[self retain] autorelease];
     id <DGGopherClientDelegate> d = _delegate;
     [self teardown];
