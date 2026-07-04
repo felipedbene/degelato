@@ -8,7 +8,9 @@ LAN-only.
 
 **Fio 1** delivered the app skeleton: the gopher socket client, the `/now`
 parser, and a text-only now-playing window. **Fio 2** adds audio — live MP3
-playback of the gopher-spot Icecast stream via CoreAudio.
+playback of the gopher-spot Icecast stream via CoreAudio. **Fio 3** adds
+transport — play/pause/next/prev, a seek bar, and a volume slider, each a
+`/spot/api/1` command that returns a fresh `/now`.
 
 ## What it does
 
@@ -29,6 +31,17 @@ Audio (fio 2):
   back onto the gopher-spot device, then streams.
 - The `audio` line reports `idle → waking… → connecting… → buffering… →
   playing`, or an error.
+
+Transport (fio 3):
+- **Prev / Play-Pause / Next** buttons, a **seek** bar, and a **volume** slider —
+  each maps to a `/spot/api/1` command (`play`/`pause`/`next`/`prev`/`seek?ms`/
+  `volume?0-100`) that returns a fresh `/now`, so one round-trip lands on current
+  state. The volume slider drives the API **device** volume (what everyone hears
+  on the stream), not the local output gain.
+- The seek bar scrubs live and issues `seek?` on mouse-up; a 1 Hz tick advances
+  it between the 2 s polls. The play/pause label follows `/now` state.
+- Commands settle with ~1–2 s of Spotify eventual consistency; the returned
+  snapshot may briefly lag, and the next poll reconciles it.
 
 ## Requirements
 
@@ -88,7 +101,7 @@ src/
   DGPLSParser.{h,m}             first stream URL from a PLS/M3U (pure)
   DGAudioStreamer.{h,m}         live Icecast MP3 via AudioFileStream/AudioQueue
   DGFontManager.{h,m}           resolve Cascadia Code (registered via Info.plist)
-  DGNowPlayingWindowController.{h,m}   window + 2 s poll + Play/Stop audio flow
+  DGNowPlayingWindowController.{h,m}   window + poll + audio + transport controls
   AppDelegate.{h,m}, main.m     programmatic app + menu bar
 tests/
   DGApiParserTests.m            parser/model edge cases + on-disk fixtures
@@ -100,14 +113,15 @@ Resources/
   DeGelato.icns, OFL.txt
 ```
 
-## Acceptance (fios 1–2)
+## Acceptance (fios 1–3)
 
 - `make` builds ppc with **zero warnings** on the G5.
 - `make test` is green (parser + PLS + client state machine).
-- Launches on Sorbet 10.5, shows live now-playing within ~3 s, and Play streams
-  the live MP3 (verified on the G5: audio pipeline primes and starts in ~2.5 s).
+- Launches on Sorbet 10.5, shows live now-playing within ~3 s; Listen streams
+  the live MP3 (audio primes in ~2.5 s); transport commands round-trip and are
+  reflected in `/now` (verified live on the G5: volume/pause/play confirmed).
 
 ## Not yet
 
-Transport controls / API volume (Fio 3), cover art (Fio 4), search (Fio 5),
-queue (Fio 6), polish/DMG (Fio 7). No prefs, no TLS, nothing off-LAN.
+Cover art (Fio 4), search (Fio 5), queue (Fio 6), polish/DMG (Fio 7).
+No prefs, no TLS, nothing off-LAN.

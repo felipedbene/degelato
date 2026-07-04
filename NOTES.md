@@ -8,13 +8,22 @@ Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
   was pulled forward into Play (device-idle handling) rather than waiting for a
   later fio. NSURLConnection on a dedicated NSThread; no GCD/blocks.
 
+- **Transport (Fio 3):** commands (`play`/`pause`/`next`/`prev`/`seek?`/`volume?`)
+  go over the same DGGopherClient path (one `_cmdClient`); each returns a fresh
+  `/now` which we adopt (checking for an `error` key first). Seek slider scrubs
+  live, issues `seek?` on mouse-up; a 1 Hz tick advances it between polls without
+  fighting the drag (`_userSeeking`). Volume slider drives the API device volume.
+
 ## Deferred to later fios
-- **Transport (Fio 3):** wire the frozen commands (`play`/`pause`/`next`/`prev`/
-  `volume?`/`seek?`) — each returns a fresh `/now` snapshot, so the client can
-  reuse the same parse path. API `volume?` + a local volume slider live here too.
-- **Pause vs stop:** Play currently starts/stops the stream outright. A true
-  pause (`AudioQueuePause`, already in DGAudioStreamer) can wire to the transport
-  pause in Fio 3.
+- **Eventual consistency:** a command's returned `/now` can lag Spotify by
+  ~1–2 s (verified: firing pause→play back-to-back, each reply showed the
+  previous state). The UI adopts the reply optimistically; the 2 s poll
+  reconciles. A monotonic-ts guard (like DeToca's DTSnapshotGuard) would stop a
+  staler replica from rewinding the UI — worth adding if two pods ever disagree.
+- **Cover art (Fio 4):** `/cover/<album_id>/<size>` — `album_id` already parsed.
+- **Audio pause:** transport pause stops Spotify; the local stream keeps buffering
+  silence. Could `AudioQueuePause` the streamer in sympathy, but the pipe is live
+  radio — simplest to leave it and let Listen/Stop own the local side.
 - **Cover art (Fio 4):** `/cover/<album_id>/<size>` — `album_id` is already
   parsed into the snapshot, unused for now.
 - **Wake (Fio 5):** when `device == idle`, offer a wake action; the window

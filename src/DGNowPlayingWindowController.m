@@ -1,6 +1,6 @@
 //
 //  DGNowPlayingWindowController.m
-//  DeGelato — fio 1 + fio 2
+//  DeGelato — fios 1–3
 //
 
 #import "DGNowPlayingWindowController.h"
@@ -14,12 +14,16 @@
 #define DG_SELECTOR      @"/spot/api/1/now"
 #define DG_PLS_SELECTOR  @"/spot/stream.pls"
 #define DG_WAKE_SELECTOR @"/spot/api/1/wake?play=1"
-#define DG_POLL_INTERVAL 2.0     // the server micro-caches /now (~1s); never faster
-#define DG_STREAM_VOLUME 0.75f
+#define DG_POLL_INTERVAL 2.0
+#define DG_TICK_INTERVAL 1.0
+#define DG_STREAM_VOLUME 1.0f    // loudness is controlled via the API device volume
 
 @interface DGNowPlayingWindowController ()
-- (NSTextField *)addLabelAtY:(CGFloat)y size:(CGFloat)size color:(NSColor *)color;
+- (NSTextField *)addLabelAtY:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color;
+- (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action;
+- (void)sendCommand:(NSString *)selector;
 - (void)render;
+- (void)renderProgress;
 - (void)renderAudio;
 - (void)beginDiscovery;
 - (void)startStreamerWithURL:(NSString *)url;
@@ -32,7 +36,7 @@
 
 - (id)init
 {
-    NSRect frame = NSMakeRect(0, 0, 440, 300);
+    NSRect frame = NSMakeRect(0, 0, 440, 324);
     NSUInteger style = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask;
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
@@ -44,31 +48,49 @@
 
     self = [super initWithWindow:window];
     if (self != nil) {
-        _trackLabel  = [self addLabelAtY:262 size:15 color:[NSColor controlTextColor]];
-        _artistLabel = [self addLabelAtY:238 size:13 color:[NSColor controlTextColor]];
-        _albumLabel  = [self addLabelAtY:216 size:13 color:[NSColor grayColor]];
+        NSView *c = [window contentView];
 
-        _stateLabel  = [self addLabelAtY:182 size:12 color:[NSColor grayColor]];
-        _timeLabel   = [self addLabelAtY:160 size:12 color:[NSColor grayColor]];
-        _volumeLabel = [self addLabelAtY:138 size:12 color:[NSColor grayColor]];
-        _deviceLabel = [self addLabelAtY:116 size:12 color:[NSColor grayColor]];
+        _trackLabel  = [self addLabelAtY:288 width:408 size:15 color:[NSColor controlTextColor]];
+        _artistLabel = [self addLabelAtY:266 width:408 size:13 color:[NSColor controlTextColor]];
+        _albumLabel  = [self addLabelAtY:246 width:408 size:12 color:[NSColor grayColor]];
+        _deviceLabel = [self addLabelAtY:222 width:408 size:12 color:[NSColor grayColor]];
 
-        _audioLabel  = [self addLabelAtY:88 size:12 color:[NSColor controlTextColor]];
-        _statusLabel = [self addLabelAtY:62 size:12 color:[NSColor redColor]];
+        _timeLabel   = [self addLabelAtY:196 width:408 size:12 color:[NSColor grayColor]];
 
-        _playButton = [[[NSButton alloc] initWithFrame:NSMakeRect(232, 14, 92, 30)] autorelease];
-        [_playButton setBezelStyle:NSRoundedBezelStyle];
-        [_playButton setTitle:@"Play"];
-        [_playButton setTarget:self];
-        [_playButton setAction:@selector(togglePlay:)];
-        [[window contentView] addSubview:_playButton];
+        _seekSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(16, 176, 408, 16)] autorelease];
+        [_seekSlider setMinValue:0.0];
+        [_seekSlider setMaxValue:1.0];
+        [_seekSlider setDoubleValue:0.0];
+        [_seekSlider setContinuous:YES];      // live scrub; command sent on mouse-up
+        [_seekSlider setTarget:self];
+        [_seekSlider setAction:@selector(onSeek:)];
+        [c addSubview:_seekSlider];
 
-        _refreshButton = [[[NSButton alloc] initWithFrame:NSMakeRect(332, 14, 92, 30)] autorelease];
-        [_refreshButton setBezelStyle:NSRoundedBezelStyle];
-        [_refreshButton setTitle:@"Refresh"];
-        [_refreshButton setTarget:self];
-        [_refreshButton setAction:@selector(refresh:)];
-        [[window contentView] addSubview:_refreshButton];
+        // Transport row, centered.
+        _prevButton      = [self addButtonWithFrame:NSMakeRect(120, 138, 60, 30)
+                                              title:@"Prev" action:@selector(onPrev:)];
+        _playPauseButton = [self addButtonWithFrame:NSMakeRect(188, 138, 64, 30)
+                                              title:@"Play" action:@selector(onPlayPause:)];
+        _nextButton      = [self addButtonWithFrame:NSMakeRect(260, 138, 60, 30)
+                                              title:@"Next" action:@selector(onNext:)];
+
+        _volumeLabel = [self addLabelAtY:104 width:120 size:12 color:[NSColor grayColor]];
+        _volumeSlider = [[[NSSlider alloc] initWithFrame:NSMakeRect(146, 104, 240, 16)] autorelease];
+        [_volumeSlider setMinValue:0.0];
+        [_volumeSlider setMaxValue:100.0];
+        [_volumeSlider setDoubleValue:100.0];
+        [_volumeSlider setContinuous:NO];     // apply on release (avoid API spam)
+        [_volumeSlider setTarget:self];
+        [_volumeSlider setAction:@selector(onVolume:)];
+        [c addSubview:_volumeSlider];
+
+        _audioLabel  = [self addLabelAtY:74 width:408 size:12 color:[NSColor controlTextColor]];
+        _statusLabel = [self addLabelAtY:48 width:200 size:12 color:[NSColor redColor]];
+
+        _listenButton  = [self addButtonWithFrame:NSMakeRect(232, 12, 92, 30)
+                                            title:@"Listen" action:@selector(toggleListen:)];
+        _refreshButton = [self addButtonWithFrame:NSMakeRect(332, 12, 92, 30)
+                                            title:@"Refresh" action:@selector(refresh:)];
 
         _audioState = DGAudioIdle;
         [self render];
@@ -82,16 +104,18 @@
 {
     [self stopPolling];
     [self stopAudio];
+    [_cmdClient cancel];
+    [_cmdClient release];
     [_lastSnapshot release];
     [_streamURL release];
     [_audioError release];
     [super dealloc];
 }
 
-- (NSTextField *)addLabelAtY:(CGFloat)y size:(CGFloat)size color:(NSColor *)color
+- (NSTextField *)addLabelAtY:(CGFloat)y width:(CGFloat)w size:(CGFloat)size color:(NSColor *)color
 {
     NSTextField *label = [[[NSTextField alloc]
-        initWithFrame:NSMakeRect(16, y, 408, 20)] autorelease];
+        initWithFrame:NSMakeRect(16, y, w, 20)] autorelease];
     [label setEditable:NO];
     [label setSelectable:YES];
     [label setBordered:NO];
@@ -104,6 +128,17 @@
     return label;
 }
 
+- (NSButton *)addButtonWithFrame:(NSRect)frame title:(NSString *)title action:(SEL)action
+{
+    NSButton *b = [[[NSButton alloc] initWithFrame:frame] autorelease];
+    [b setBezelStyle:NSRoundedBezelStyle];
+    [b setTitle:title];
+    [b setTarget:self];
+    [b setAction:action];
+    [[[self window] contentView] addSubview:b];
+    return b;
+}
+
 #pragma mark - Polling
 
 - (void)startPolling
@@ -111,10 +146,13 @@
     [self refresh:nil];
     if (_pollTimer == nil) {
         _pollTimer = [[NSTimer scheduledTimerWithTimeInterval:DG_POLL_INTERVAL
-                                                       target:self
-                                                     selector:@selector(pollTick:)
-                                                     userInfo:nil
-                                                      repeats:YES] retain];
+                                                       target:self selector:@selector(pollTick:)
+                                                     userInfo:nil repeats:YES] retain];
+    }
+    if (_tickTimer == nil) {
+        _tickTimer = [[NSTimer scheduledTimerWithTimeInterval:DG_TICK_INTERVAL
+                                                       target:self selector:@selector(clockTick:)
+                                                     userInfo:nil repeats:YES] retain];
     }
 }
 
@@ -123,6 +161,9 @@
     [_pollTimer invalidate];
     [_pollTimer release];
     _pollTimer = nil;
+    [_tickTimer invalidate];
+    [_tickTimer release];
+    _tickTimer = nil;
     [_client cancel];
     [_client release];
     _client = nil;
@@ -133,34 +174,86 @@
     [self refresh:nil];
 }
 
+- (void)clockTick:(NSTimer *)timer
+{
+    // Advance the seek bar / time between polls without a network hit.
+    [self renderProgress];
+}
+
 - (void)refresh:(id)sender
 {
     if (_client != nil) {
-        return;   // a poll is already in flight; skip this tick
+        return;
     }
-    _client = [[DGGopherClient clientWithHost:DG_HOST
-                                         port:DG_PORT
+    _client = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
                                      selector:DG_SELECTOR] retain];
     [_client setDelegate:self];
     [_client start];
 }
 
-#pragma mark - Audio control
+#pragma mark - Transport (fio 3)
 
-- (void)togglePlay:(id)sender
+- (void)sendCommand:(NSString *)selector
+{
+    if (_cmdClient != nil) {
+        return;   // one command at a time; drop overlapping presses
+    }
+    _cmdClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
+                                        selector:selector] retain];
+    [_cmdClient setDelegate:self];
+    [_cmdClient start];
+}
+
+- (void)onPlayPause:(id)sender
+{
+    BOOL playing = (_lastSnapshot != nil && [_lastSnapshot state] == DGPlaybackPlaying);
+    [self sendCommand:(playing ? @"/spot/api/1/pause" : @"/spot/api/1/play")];
+}
+
+- (void)onPrev:(id)sender { [self sendCommand:@"/spot/api/1/prev"]; }
+- (void)onNext:(id)sender { [self sendCommand:@"/spot/api/1/next"]; }
+
+- (void)onSeek:(id)sender
+{
+    long long dur = (_lastSnapshot != nil) ? [_lastSnapshot durationMs] : 0;
+    double frac = [_seekSlider doubleValue];
+    long long ms = (long long)(frac * (double)dur);
+
+    // Live time readout while dragging.
+    [_timeLabel setStringValue:[NSString stringWithFormat:@"time     %@ / %@",
+        [self clockFromMs:ms], [self clockFromMs:dur]]];
+
+    if ([[NSApp currentEvent] type] == NSLeftMouseUp) {
+        _userSeeking = NO;
+        if (dur > 0) {
+            [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/seek?%lld", ms]];
+        }
+    } else {
+        _userSeeking = YES;   // suppress clock-tick fighting the drag
+    }
+}
+
+- (void)onVolume:(id)sender
+{
+    NSInteger pct = (NSInteger)([_volumeSlider doubleValue] + 0.5);
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+    [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)pct]];
+    [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/volume?%ld", (long)pct]];
+}
+
+#pragma mark - Audio control (fio 2)
+
+- (void)toggleListen:(id)sender
 {
     if (_streamer != nil || _audioState != DGAudioIdle) {
-        [self stopAudio];   // also cancels an in-flight wake/discovery
+        [self stopAudio];
         return;
     }
-
-    // Fresh start. If the gopher-spot device is idle, the audio pipe won't carry
-    // the current playback — wake it (and resume) before streaming.
     if (_lastSnapshot != nil && [_lastSnapshot deviceIsIdle]) {
         _audioState = DGAudioWaking;
         [self renderAudio];
-        _wakeClient = [[DGGopherClient clientWithHost:DG_HOST
-                                                 port:DG_PORT
+        _wakeClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
                                              selector:DG_WAKE_SELECTOR] retain];
         [_wakeClient setDelegate:self];
         [_wakeClient start];
@@ -173,8 +266,7 @@
 {
     _audioState = DGAudioDiscovering;
     [self renderAudio];
-    _plsClient = [[DGGopherClient clientWithHost:DG_HOST
-                                            port:DG_PORT
+    _plsClient = [[DGGopherClient clientWithHost:DG_HOST port:DG_PORT
                                         selector:DG_PLS_SELECTOR] retain];
     [_plsClient setDelegate:self];
     [_plsClient start];
@@ -184,7 +276,6 @@
 {
     [_streamURL release];
     _streamURL = [url copy];
-
     _streamer = [[DGAudioStreamer alloc] initWithURLString:_streamURL];
     [_streamer setDelegate:self];
     [_streamer setVolume:DG_STREAM_VOLUME];
@@ -207,7 +298,6 @@
     [_wakeClient cancel];
     [_wakeClient release];
     _wakeClient = nil;
-
     _audioState = DGAudioIdle;
     [self renderAudio];
 }
@@ -218,27 +308,28 @@
 {
     NSString *text = [DGApiParser textFromData:data];
 
-    if (client == _client) {
-        // /now poll.
-        DGNowSnapshot *snap = [DGApiParser snapshotFromResponse:text];
-        [_lastSnapshot release];
-        _lastSnapshot = [snap retain];
-        [_statusLabel setStringValue:@""];
-        [self render];
-        [_client release];
-        _client = nil;
-        return;
-    }
+    if (client == _client || client == _wakeClient || client == _cmdClient) {
+        // All of these return a /now snapshot (or an error document).
+        NSDictionary *fields = [DGApiParser fieldsFromResponse:text];
+        NSString *errCode = [fields objectForKey:@"error"];
+        if (errCode != nil) {
+            NSString *msg = [fields objectForKey:@"message"];
+            [_statusLabel setStringValue:[NSString stringWithFormat:@"error: %@",
+                (msg ? msg : errCode)]];
+        } else {
+            DGNowSnapshot *snap = [DGApiParser snapshotFromFields:fields];
+            [_lastSnapshot release];
+            _lastSnapshot = [snap retain];
+            [_statusLabel setStringValue:@""];
+            [self render];
+        }
 
-    if (client == _wakeClient) {
-        // wake?play=1 returns a fresh /now snapshot; adopt it, then discover.
-        DGNowSnapshot *snap = [DGApiParser snapshotFromResponse:text];
-        [_lastSnapshot release];
-        _lastSnapshot = [snap retain];
-        [self render];
-        [_wakeClient release];
-        _wakeClient = nil;
-        if (_audioState == DGAudioWaking) {
+        BOOL wasWake = (client == _wakeClient);
+        if (client == _client)   { [_client release];   _client = nil; }
+        if (client == _wakeClient) { [_wakeClient release]; _wakeClient = nil; }
+        if (client == _cmdClient)  { [_cmdClient release];  _cmdClient = nil; }
+
+        if (wasWake && _audioState == DGAudioWaking) {
             [self beginDiscovery];
         }
         return;
@@ -250,7 +341,7 @@
         _plsClient = nil;
         if ([url length] == 0) {
             [_audioError release];
-            _audioError = [@"audio: no stream URL in playlist" copy];
+            _audioError = [@"audio    no stream URL in playlist" copy];
             _audioState = DGAudioError;
             [self renderAudio];
             return;
@@ -268,10 +359,15 @@
         _client = nil;
         return;
     }
+    if (client == _cmdClient) {
+        [_statusLabel setStringValue:@"command failed"];
+        [_cmdClient release];
+        _cmdClient = nil;
+        return;
+    }
     if (client == _wakeClient) {
         [_wakeClient release];
         _wakeClient = nil;
-        // Wake failed, but the stream may still carry something — try anyway.
         if (_audioState == DGAudioWaking) {
             [self beginDiscovery];
         }
@@ -281,41 +377,35 @@
         [_plsClient release];
         _plsClient = nil;
         [_audioError release];
-        _audioError = [@"audio: stream unavailable" copy];
+        _audioError = [@"audio    stream unavailable" copy];
         _audioState = DGAudioError;
         [self renderAudio];
         return;
     }
 }
 
-#pragma mark - DGAudioStreamerDelegate (already on the main thread)
+#pragma mark - DGAudioStreamerDelegate (main thread)
 
 - (void)audioStreamerDidStartPlaying:(DGAudioStreamer *)streamer
 {
-    if (streamer != _streamer) {
-        return;
-    }
+    if (streamer != _streamer) { return; }
     _audioState = DGAudioPlaying;
     [self renderAudio];
 }
 
 - (void)audioStreamer:(DGAudioStreamer *)streamer didFailWithMessage:(NSString *)message
 {
-    if (streamer != _streamer) {
-        return;
-    }
+    if (streamer != _streamer) { return; }
     [_audioError release];
-    _audioError = [[NSString stringWithFormat:@"audio: %@", message] copy];
-    [self stopAudio];              // tears the streamer down; sets state idle
-    _audioState = DGAudioError;    // ...then surface the error
+    _audioError = [[NSString stringWithFormat:@"audio    %@", message] copy];
+    [self stopAudio];
+    _audioState = DGAudioError;
     [self renderAudio];
 }
 
 - (void)audioStreamerDidFinish:(DGAudioStreamer *)streamer
 {
-    if (streamer != _streamer) {
-        return;
-    }
+    if (streamer != _streamer) { return; }
     [self stopAudio];
 }
 
@@ -328,10 +418,10 @@
         [_trackLabel setStringValue:@"connecting…"];
         [_artistLabel setStringValue:@""];
         [_albumLabel setStringValue:@""];
-        [_stateLabel setStringValue:@""];
-        [_timeLabel setStringValue:@""];
-        [_volumeLabel setStringValue:@""];
         [_deviceLabel setStringValue:@""];
+        [_timeLabel setStringValue:@""];
+        [_volumeLabel setStringValue:@"volume"];
+        [_playPauseButton setTitle:@"Play"];
         return;
     }
 
@@ -345,28 +435,6 @@
         [_albumLabel setStringValue:@""];
     }
 
-    NSString *state;
-    switch ([s state]) {
-        case DGPlaybackPlaying: state = @"playing"; break;
-        case DGPlaybackPaused:  state = @"paused";  break;
-        default:                state = @"stopped"; break;
-    }
-    [_stateLabel setStringValue:[NSString stringWithFormat:@"state    %@", state]];
-
-    if ([s hasTrack]) {
-        long long pos = [s interpolatedPositionMsAtEpochMs:[self nowEpochMs]];
-        [_timeLabel setStringValue:[NSString stringWithFormat:@"time     %@ / %@",
-            [self clockFromMs:pos], [self clockFromMs:[s durationMs]]]];
-    } else {
-        [_timeLabel setStringValue:@"time     —"];
-    }
-
-    if ([s hasVolume]) {
-        [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume   %ld%%", (long)[s volume]]];
-    } else {
-        [_volumeLabel setStringValue:@"volume   —"];
-    }
-
     NSString *device;
     switch ([s device]) {
         case DGDeviceActive: device = @"active"; break;
@@ -374,6 +442,34 @@
         default:             device = @"unknown"; break;
     }
     [_deviceLabel setStringValue:[NSString stringWithFormat:@"device   %@", device]];
+
+    [_playPauseButton setTitle:([s state] == DGPlaybackPlaying ? @"Pause" : @"Play")];
+
+    if ([s hasVolume]) {
+        [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)[s volume]]];
+        [_volumeSlider setDoubleValue:(double)[s volume]];
+    } else {
+        [_volumeLabel setStringValue:@"volume  —"];
+    }
+
+    [self renderProgress];
+}
+
+- (void)renderProgress
+{
+    DGNowSnapshot *s = _lastSnapshot;
+    if (s == nil || ![s hasTrack]) {
+        [_timeLabel setStringValue:@"time     —"];
+        if (!_userSeeking) { [_seekSlider setDoubleValue:0.0]; }
+        return;
+    }
+    long long dur = [s durationMs];
+    long long pos = [s interpolatedPositionMsAtEpochMs:[self nowEpochMs]];
+    [_timeLabel setStringValue:[NSString stringWithFormat:@"time     %@ / %@",
+        [self clockFromMs:pos], [self clockFromMs:dur]]];
+    if (!_userSeeking) {
+        [_seekSlider setDoubleValue:(dur > 0 ? (double)pos / (double)dur : 0.0)];
+    }
 }
 
 - (void)renderAudio
@@ -388,14 +484,14 @@
         case DGAudioPlaying:     audio = @"audio    playing";        button = @"Stop"; break;
         case DGAudioError:
             audio = (_audioError ? _audioError : @"audio    error");
-            button = @"Play";
+            button = @"Listen";
             color = [NSColor redColor];
             break;
-        default:                 audio = @"audio    idle";          button = @"Play"; break;
+        default:                 audio = @"audio    idle";          button = @"Listen"; break;
     }
     [_audioLabel setTextColor:color];
     [_audioLabel setStringValue:audio];
-    [_playButton setTitle:button];
+    [_listenButton setTitle:button];
 }
 
 - (long long)nowEpochMs
@@ -405,13 +501,9 @@
 
 - (NSString *)clockFromMs:(long long)ms
 {
-    if (ms < 0) {
-        ms = 0;
-    }
+    if (ms < 0) { ms = 0; }
     long long totalSec = ms / 1000;
-    long long m = totalSec / 60;
-    long long sec = totalSec % 60;
-    return [NSString stringWithFormat:@"%lld:%02lld", m, sec];
+    return [NSString stringWithFormat:@"%lld:%02lld", totalSec / 60, totalSec % 60];
 }
 
 @end
