@@ -156,13 +156,16 @@ static NSError *DGMakeError(NSInteger code, NSString *message)
     NSString *line = [(_selector ? _selector : @"") stringByAppendingString:@"\r\n"];
     NSData *reqData = [line dataUsingEncoding:NSUTF8StringEncoding];
 
-    // Numeric-only resolution: a literal IP resolves instantly with no DNS/mDNS
-    // round-trip — the CFHost path Arm C exists to bypass.
+    // libc resolver (the path nc uses): a numeric literal resolves instantly
+    // without any DNS/mDNS query (getaddrinfo recognises it via inet_pton), and a
+    // real hostname — needed by the gopher browser — resolves via normal DNS. We
+    // deliberately do NOT use CFHost/CFStream, whose numeric-literal-through-mDNS
+    // path was R7 (see the header + design/INVESTIGATION-command-spam.md).
     struct addrinfo hints;
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_NUMERICHOST;
+    hints.ai_flags = 0;
     struct addrinfo *res = NULL;
     if (getaddrinfo(hostC, portStr, &hints, &res) != 0 || res == NULL) {
         if (res) freeaddrinfo(res);

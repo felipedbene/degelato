@@ -7,6 +7,10 @@
 #import "DGNowPlayingWindowController.h"
 #import "DGLibraryWindowController.h"
 #import "DGPreferencesController.h"
+#import "DGGopherWindowController.h"
+#import "DGGopherResource.h"
+
+#define DG_GOPHER_HOME @"gopher.debene.dev"
 
 @interface AppDelegate ()
 - (void)buildMenuBar;
@@ -15,6 +19,10 @@
 - (void)openQueue:(id)sender;
 - (void)openPlaylists:(id)sender;
 - (void)showPreferences:(id)sender;
+- (void)openLocation:(id)sender;
+- (void)goHome:(id)sender;
+- (void)openGopherResource:(DGGopherResource *)res fromWindow:(NSWindow *)parent;
+- (void)gopherWindowWillClose:(NSNotification *)note;
 - (void)wakeDevice:(id)sender;
 @end
 
@@ -69,6 +77,60 @@
 - (void)openQueue:(id)sender     { [[self library] showInMode:DGLibraryModeFila]; }
 - (void)openPlaylists:(id)sender { [[self library] showInMode:DGLibraryModePlaylists]; }
 
+#pragma mark - Gopher browser
+
+- (void)openGopherResource:(DGGopherResource *)res fromWindow:(NSWindow *)parent
+{
+    if (res == nil) { return; }
+    if (_gopherWindows == nil) { _gopherWindows = [[NSMutableArray alloc] init]; }
+    DGGopherWindowController *wc =
+        [[[DGGopherWindowController alloc] initWithResource:res parentWindow:parent] autorelease];
+    [_gopherWindows addObject:wc];   // retained until the window closes
+    [[NSNotificationCenter defaultCenter] addObserver:self
+        selector:@selector(gopherWindowWillClose:)
+            name:NSWindowWillCloseNotification object:[wc window]];
+    [wc showWindow:self];
+    [[wc window] makeKeyAndOrderFront:self];
+    [wc load];
+}
+
+- (void)gopherWindowWillClose:(NSNotification *)note
+{
+    NSWindow *w = [note object];
+    NSUInteger i;
+    for (i = 0; i < [_gopherWindows count]; i++) {
+        DGGopherWindowController *wc = [_gopherWindows objectAtIndex:i];
+        if ([wc window] == w) {
+            [[NSNotificationCenter defaultCenter] removeObserver:self
+                name:NSWindowWillCloseNotification object:w];
+            [_gopherWindows removeObjectAtIndex:i];
+            break;
+        }
+    }
+}
+
+- (void)goHome:(id)sender
+{
+    [self openGopherResource:[DGGopherResource resourceFromLocationString:DG_GOPHER_HOME]
+                  fromWindow:nil];
+}
+
+- (void)openLocation:(id)sender
+{
+    NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+    [alert setMessageText:@"Open Gopher Location"];
+    [alert setInformativeText:@"A host, host:port, or gopher://host/… address."];
+    [alert addButtonWithTitle:@"Open"];
+    [alert addButtonWithTitle:@"Cancel"];
+    NSTextField *input = [[[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 24)] autorelease];
+    [input setStringValue:DG_GOPHER_HOME];
+    [alert setAccessoryView:input];
+    if ([alert runModal] == NSAlertFirstButtonReturn) {
+        [self openGopherResource:[DGGopherResource resourceFromLocationString:[input stringValue]]
+                      fromWindow:nil];
+    }
+}
+
 - (void)showPreferences:(id)sender
 {
     if (_prefs == nil) {
@@ -87,11 +149,13 @@
 
 - (void)dealloc
 {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
     [_mediaKeyTap stop];
     [_mediaKeyTap release];
     [_nowPlaying release];
     [_library release];
     [_prefs release];
+    [_gopherWindows release];
     [super dealloc];
 }
 
@@ -142,6 +206,20 @@
     [[ctlMenu addItemWithTitle:@"Wake Device"
                         action:@selector(wakeDevice:)
                  keyEquivalent:@""] setTarget:self];
+
+    // Gopher menu (fio 20): general RFC 1436 browsing.
+    NSMenuItem *gphItem = [[[NSMenuItem alloc] initWithTitle:@"Gopher"
+                                                      action:NULL
+                                               keyEquivalent:@""] autorelease];
+    [mainMenu addItem:gphItem];
+    NSMenu *gphMenu = [[[NSMenu alloc] initWithTitle:@"Gopher"] autorelease];
+    [gphItem setSubmenu:gphMenu];
+    [[gphMenu addItemWithTitle:@"Home"
+                        action:@selector(goHome:)
+                 keyEquivalent:@"H"] setTarget:self];
+    [[gphMenu addItemWithTitle:@"Open Location…"
+                        action:@selector(openLocation:)
+                 keyEquivalent:@"l"] setTarget:self];
 
     // Window menu.
     NSMenuItem *winItem = [[[NSMenuItem alloc] initWithTitle:@"Window"

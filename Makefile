@@ -45,7 +45,10 @@ MODEL_SRC = \
 	src/DGServerPrefs.m \
 	src/DGCoverCache.m \
 	src/DGPlaylistItem.m \
-	src/DGMediaKeyRouter.m
+	src/DGMediaKeyRouter.m \
+	src/DGGopherItem.m \
+	src/DGGopherResource.m \
+	src/DGGopherMenuParser.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -63,6 +66,7 @@ UI_SRC = \
 	src/DGTrackCell.m \
 	src/DGLibraryWindowController.m \
 	src/DGMediaKeyTap.m \
+	src/DGGopherWindowController.m \
 	src/DGPreferencesController.m \
 	src/AppDelegate.m \
 	src/main.m
@@ -121,7 +125,8 @@ TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGServerPrefsTests.m \
            tests/DGCoverCacheTests.m \
            tests/DGPlaylistItemTests.m \
-           tests/DGMediaKeyRouterTests.m
+           tests/DGMediaKeyRouterTests.m \
+           tests/DGGopherTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"
