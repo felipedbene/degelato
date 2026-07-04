@@ -13,7 +13,13 @@
 #   make SDK=/Developer/SDKs/MacOSX10.5.sdk ARCH=ppc
 
 SDK      ?= /Developer/SDKs/MacOSX10.5.sdk
-ARCH     ?= ppc
+# 32-bit Universal (ppc + i386) — the most broadly runnable build: a 32-bit app
+# runs on EVERY Mac (all PPC G3/G4/G5 and all Intel, incl. 64-bit machines). The
+# 64-bit slices are deliberately NOT built: 10.5 shipped an incomplete 64-bit
+# library set (ppc64 can't even load libsqlite3 → the app won't launch), and they
+# add no machine the 32-bit slices don't already cover.
+ARCHS    ?= ppc i386
+ARCH     ?= ppc            # the single arch used to RUN otest natively on the G5
 CC       ?= gcc
 MINVER    = -mmacosx-version-min=10.5
 
@@ -22,7 +28,7 @@ DEVFRAMEWORKS = /Developer/Library/Frameworks
 
 # No -fblocks: blocks do not exist on 10.5 / GCC 4.2. Fragile-ABI safety comes
 # from explicit ivars + @synthesize in the sources, not from a flag.
-COMMON = -arch $(ARCH) -isysroot $(SDK) $(MINVER) -Wall -Isrc
+COMMON = $(patsubst %,-arch %,$(ARCHS)) -isysroot $(SDK) $(MINVER) -Wall -Isrc
 
 APP        = DeGelato.app
 APP_BINARY = $(APP)/Contents/MacOS/DeGelato
