@@ -97,7 +97,7 @@
         [_volumeSlider setMinValue:0.0];
         [_volumeSlider setMaxValue:100.0];
         [_volumeSlider setDoubleValue:100.0];
-        [_volumeSlider setContinuous:NO];     // apply on release (avoid API spam)
+        [_volumeSlider setContinuous:YES];    // live: arm the hold each drag callback; send once on mouse-up
         [_volumeSlider setTarget:self];
         [_volumeSlider setAction:@selector(onVolume:)];
         [c addSubview:_volumeSlider];
@@ -446,10 +446,22 @@
     if (pct < 0) pct = 0;
     if (pct > 100) pct = 100;
     [_volumeLabel setStringValue:[NSString stringWithFormat:@"volume  %ld%%", (long)pct]];
-    // Hold reconciliation off the volume slider through the eventual-consistency
-    // window, or the stale command reply snaps the thumb back to the old value.
+
+    // Arm the hold on EVERY callback (the slider is continuous now). This is the
+    // R6 fix: with the old continuous:NO slider no hold was set until mouse-up, so
+    // a poll's -render landing mid-drag (streams run in common modes) called
+    // -setDoubleValue: on the very thumb under the user's finger and yanked it
+    // back to the stale server value. Holding through the drag blocks that
+    // reconciliation, and the hold also covers the command's settle window.
     _volumeHoldUntilMs = [self nowEpochMs] + 3000;
-    [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/volume?%ld", (long)pct]];
+
+    // Send once, at end-of-tracking (mouse) or per keypress (keyboard) — not on
+    // every drag sample, which would spray /volume commands.
+    NSEventType t = [[NSApp currentEvent] type];
+    if (t == NSLeftMouseUp || t == NSKeyDown || t == NSKeyUp) {
+        [self sendCommand:[NSString stringWithFormat:@"/spot/api/1/volume?%ld", (long)pct]];
+    }
+    // else: NSLeftMouseDown / NSLeftMouseDragged — live label + hold only.
 }
 
 #pragma mark - Audio control (fio 2)
