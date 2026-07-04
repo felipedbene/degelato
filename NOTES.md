@@ -27,7 +27,20 @@ Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
   change so the stale command reply can't snap them back; the seek slider commits
   via a 0.35 s debounce (input-agnostic — works for keyboard, no mouse-up sniff).
 
+## Done (fio 5)
+- **Search:** `/spot/api/1/search?q=<urlencoded>` in a separate window; query
+  percent-escaped via CFURLCreateStringByAddingPercentEscapes (UTF-8). Results are
+  DGTrackItem rows (shared with a future /queue). Play a result on double-click
+  via the **human** `/spot/play?uri=<track uri>` selector — the machine API has no
+  play-by-uri; the reply is a discarded gophermap.
+- **Wake:** Controls ▸ Wake Device fires bare `/spot/api/1/wake`.
+- NSTableView data-source/delegate are informal on 10.5 (formal protocols 10.6+) —
+  implemented, not declared, same lesson as NSStreamDelegate.
+
 ## Deferred to later fios
+- **Queue (Fio 6):** `/spot/api/1/queue` reuses DGTrackItem verbatim; add-to-queue
+  is `/spot/api/1/queue/add?<uri>` (returns /queue). A "Queue" action on a search
+  result is a one-liner once the queue window exists.
 - **Eventual consistency:** a command's returned `/now` can lag Spotify by
   ~1–2 s (verified: firing pause→play back-to-back, each reply showed the
   previous state). The UI adopts the reply optimistically; the 2 s poll
@@ -41,8 +54,6 @@ Scratchpad for unfinished ideas. Nothing here ships in Fio 1.
 - **Audio pause:** transport pause stops Spotify; the local stream keeps buffering
   silence. Could `AudioQueuePause` the streamer in sympathy, but the pipe is live
   radio — simplest to leave it and let Listen/Stop own the local side.
-- **Cover art (Fio 4):** `/cover/<album_id>/<size>` — `album_id` is already
-  parsed into the snapshot, unused for now.
 - **Wake (Fio 5):** when `device == idle`, offer a wake action; the window
   already renders "idle (playing elsewhere)".
 

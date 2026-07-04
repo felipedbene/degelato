@@ -5,9 +5,12 @@
 
 #import "AppDelegate.h"
 #import "DGNowPlayingWindowController.h"
+#import "DGSearchWindowController.h"
 
 @interface AppDelegate ()
 - (void)buildMenuBar;
+- (void)openSearch:(id)sender;
+- (void)wakeDevice:(id)sender;
 @end
 
 @implementation AppDelegate
@@ -32,9 +35,26 @@
     return YES;
 }
 
+- (void)openSearch:(id)sender
+{
+    if (_search == nil) {
+        _search = [[DGSearchWindowController alloc] init];
+    }
+    [_search showWindow:self];
+    [[_search window] makeKeyAndOrderFront:self];
+}
+
+// Wake without changing play/pause state; forwarded to the now-playing window,
+// which owns the gopher command path and adopts the returned /now.
+- (void)wakeDevice:(id)sender
+{
+    [_nowPlaying wakeDevice:sender];
+}
+
 - (void)dealloc
 {
     [_nowPlaying release];
+    [_search release];
     [super dealloc];
 }
 
@@ -60,6 +80,20 @@
     [appMenu addItemWithTitle:@"Quit DeGelato"
                        action:@selector(terminate:)
                 keyEquivalent:@"q"];
+
+    // Controls menu (fio 5): search + explicit wake.
+    NSMenuItem *ctlItem = [[[NSMenuItem alloc] initWithTitle:@"Controls"
+                                                      action:NULL
+                                               keyEquivalent:@""] autorelease];
+    [mainMenu addItem:ctlItem];
+    NSMenu *ctlMenu = [[[NSMenu alloc] initWithTitle:@"Controls"] autorelease];
+    [ctlItem setSubmenu:ctlMenu];
+    [[ctlMenu addItemWithTitle:@"Search…"
+                        action:@selector(openSearch:)
+                 keyEquivalent:@"f"] setTarget:self];
+    [[ctlMenu addItemWithTitle:@"Wake Device"
+                        action:@selector(wakeDevice:)
+                 keyEquivalent:@""] setTarget:self];
 
     // Window menu.
     NSMenuItem *winItem = [[[NSMenuItem alloc] initWithTitle:@"Window"

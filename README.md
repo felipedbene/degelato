@@ -12,6 +12,7 @@ playback of the gopher-spot Icecast stream via CoreAudio. **Fio 3** adds
 transport — play/pause/next/prev, a seek bar, and a volume slider, each a
 `/spot/api/1` command that returns a fresh `/now`. **Fio 4** adds album cover
 art, fetched from `/cover/<album_id>/<size>` and drawn beside the text.
+**Fio 5** adds a search window and an explicit device wake.
 
 ## What it does
 
@@ -43,6 +44,14 @@ Transport (fio 3):
   it between the 2 s polls. The play/pause label follows `/now` state.
 - Commands settle with ~1–2 s of Spotify eventual consistency; the returned
   snapshot may briefly lag, and the next poll reconciles it.
+
+Search + wake (fio 5):
+- **Controls ▸ Search…** (⌘F) opens a separate window: type a query, Enter runs
+  `/spot/api/1/search?q=<urlencoded>` (UTF-8, capped at 10 by Spotify), and the
+  results table shows track / artist / time. **Double-click** a result to start
+  it on the device via the human `/spot/play?uri=<track uri>` selector.
+- **Controls ▸ Wake Device** fires a bare `/spot/api/1/wake` (transfer playback
+  onto gopher-spot without changing play/pause), adopting the returned `/now`.
 
 ## Requirements
 
@@ -100,15 +109,18 @@ src/
   DGNowSnapshot.{h,m}            immutable parsed /now snapshot (model)
   DGApiParser.{h,m}             raw text -> fields -> snapshot (pure)
   DGPLSParser.{h,m}             first stream URL from a PLS/M3U (pure)
+  DGTrackItem.{h,m}             one item.<i>.* row from a /queue or /search list
   DGAudioStreamer.{h,m}         live Icecast MP3 via AudioFileStream/AudioQueue
   DGFontManager.{h,m}           resolve Cascadia Code (registered via Info.plist)
   DGNowPlayingWindowController.{h,m}   window + poll + audio + transport controls
-  AppDelegate.{h,m}, main.m     programmatic app + menu bar
+  DGSearchWindowController.{h,m}   search field + results table + play-on-double-click
+  AppDelegate.{h,m}, main.m     programmatic app + menu bar (Controls menu)
 tests/
   DGApiParserTests.m            parser/model edge cases + on-disk fixtures
   DGGopherClientTests.m         client state machine vs a localhost loopback
   DGPLSParserTests.m            stream-URL extraction (PLS + M3U)
-Tests/Fixtures/                 now_live + degenerate /now + real stream.pls
+  DGTrackItemTests.m            v1 list parsing (queue/search item.<i>.*)
+Tests/Fixtures/                 now_live + degenerate /now + stream.pls + cover + search
 Resources/
   Fonts/CascadiaCode-Regular.ttf   bundled font (ATSApplicationFontsPath = Fonts)
   DeGelato.icns, OFL.txt
@@ -124,5 +136,5 @@ Resources/
 
 ## Not yet
 
-Cover art (Fio 4), search (Fio 5), queue (Fio 6), polish/DMG (Fio 7).
-No prefs, no TLS, nothing off-LAN.
+Queue view (Fio 6), playlists, polish/DMG (Fio 7). No prefs, no TLS,
+nothing off-LAN.

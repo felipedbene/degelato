@@ -36,7 +36,8 @@ ICON       = Resources/DeGelato.icns
 MODEL_SRC = \
 	src/DGNowSnapshot.m \
 	src/DGApiParser.m \
-	src/DGPLSParser.m
+	src/DGPLSParser.m \
+	src/DGTrackItem.m
 
 # Networking: run-loop-scheduled NSStream (Foundation + CoreFoundation). Tested
 # against a localhost loopback server.
@@ -51,6 +52,7 @@ AUDIO_SRC = \
 UI_SRC = \
 	src/DGFontManager.m \
 	src/DGNowPlayingWindowController.m \
+	src/DGSearchWindowController.m \
 	src/AppDelegate.m \
 	src/main.m
 
@@ -84,7 +86,8 @@ TEST_BUNDLE = Tests.octest
 TEST_SRC = $(MODEL_SRC) $(NET_SRC) \
            tests/DGApiParserTests.m \
            tests/DGGopherClientTests.m \
-           tests/DGPLSParserTests.m
+           tests/DGPLSParserTests.m \
+           tests/DGTrackItemTests.m
 
 test: $(TEST_SRC) tests/Tests-Info.plist
 	@echo "  Building $(TEST_BUNDLE)"

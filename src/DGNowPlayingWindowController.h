@@ -78,6 +78,10 @@ typedef enum {
 // Audio (fio 2)
 - (void)toggleListen:(id)sender;
 
+// Wake (fio 5): transfer playback onto the gopher-spot device without changing
+// play/pause state (bare wake). Returns /now, adopted like any command.
+- (void)wakeDevice:(id)sender;
+
 // Transport (fio 3)
 - (void)onPlayPause:(id)sender;
 - (void)onPrev:(id)sender;

@@ -265,6 +265,8 @@
 - (void)onPrev:(id)sender { [self sendCommand:@"/spot/api/1/prev"]; }
 - (void)onNext:(id)sender { [self sendCommand:@"/spot/api/1/next"]; }
 
+- (void)wakeDevice:(id)sender { [self sendCommand:@"/spot/api/1/wake"]; }
+
 - (void)onSeek:(id)sender
 {
     long long dur = (_lastSnapshot != nil) ? [_lastSnapshot durationMs] : 0;
