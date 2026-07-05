@@ -142,11 +142,15 @@ Capture a fresh fixture from the live server:
 printf '/spot/api/1/now\r\n' | nc 10.0.100.112 70 > Tests/Fixtures/now_live.txt
 ```
 
+The reusable, platform-agnostic recipe for writing a client like this one lives
+in the umbrella repo: **[fhb ▸ CLIENT-PATTERN.md](https://github.com/felipedbene/fhb/blob/main/CLIENT-PATTERN.md)**.
+DeGelato is its ppc / 10.5 reference implementation.
+
 ## Layout
 
 ```
 src/
-  DGGopherClient.{h,m}            run-loop NSStream gopher transaction
+  DGGopherClient.{h,m}            BSD-socket gopher transaction (worker thread)
   DGNowSnapshot.{h,m}            immutable parsed /now snapshot (model)
   DGApiParser.{h,m}             raw text -> fields -> snapshot (pure)
   DGPLSParser.{h,m}             first stream URL from a PLS/M3U (pure)
