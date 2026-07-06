@@ -2,9 +2,12 @@
 
 A native Cocoa Spotify remote — *the essential Radinho* — for **Sorbet Leopard
 10.5.x on a Power Mac G5** (ppc, 32-bit). It is the PowerPC sibling of
-[DeToca](https://github.com/felipedbene/detoca) (Snow Leopard 10.6.8) and speaks
-the frozen **gopher-spot machine API `/spot/api/1`** over raw gopher (RFC 1436),
-LAN-only.
+[DeToca](https://github.com/felipedbene/detoca) (Snow Leopard 10.6.8) — and the
+middle rung between it and [Casquinha](https://github.com/felipedbene/casquinha)
+(Mac OS 9.2 / classic Toolbox, the oldest machine yet) — speaking the frozen
+**[gopher-spot](https://github.com/felipedbene/gopher-spot) machine API
+`/spot/api/1`** over raw gopher (RFC 1436), LAN-only. All three follow the same
+recipe: [**fhb ▸ CLIENT-PATTERN.md**](https://github.com/felipedbene/fhb/blob/main/CLIENT-PATTERN.md).
 
 **Fio 1** delivered the app skeleton: the gopher socket client, the `/now`
 parser, and a text-only now-playing window. **Fio 2** adds audio — live MP3
