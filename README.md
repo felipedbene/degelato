@@ -111,7 +111,7 @@ make clean
 
 Open **DeGelato-1.0.dmg** (from `make dmg`) and drag **DeGelato** onto
 **Applications**. ppc / Sorbet Leopard 10.5 only; the app is LAN-only and needs
-the gopher-spot server reachable at `10.0.100.112:70`.
+the gopher-spot server reachable at `192.0.2.10:70`.
 
 Defaults live at the top of the `Makefile` (`SDK`, `ARCH=ppc`, `CC=gcc`);
 override on the command line if your SDK is elsewhere.
@@ -132,7 +132,7 @@ Never re-enable NTP from a build script.
 
 ## Network contract (v1, frozen)
 
-- Server: `10.0.100.112:70` (LAN only, plain TCP, no TLS).
+- Server: `192.0.2.10:70` (LAN only, plain TCP, no TLS).
 - Write `selector\r\n`, read to EOF. `/now` returns UTF-8 `key<TAB>value` lines
   (CRLF, bare LF tolerated). See `gopher-spot/API.md` for the exact keys.
 - **The client ignores unknown keys and tolerates missing ones** — the API is
@@ -142,7 +142,7 @@ Never re-enable NTP from a build script.
 Capture a fresh fixture from the live server:
 
 ```sh
-printf '/spot/api/1/now\r\n' | nc 10.0.100.112 70 > Tests/Fixtures/now_live.txt
+printf '/spot/api/1/now\r\n' | nc 192.0.2.10 70 > tests/Fixtures/now_live.txt
 ```
 
 The reusable, platform-agnostic recipe for writing a client like this one lives
@@ -160,16 +160,22 @@ src/
   DGTrackItem.{h,m}             one item.<i>.* row from a /queue or /search list
   DGAudioStreamer.{h,m}         live Icecast MP3 via AudioFileStream/AudioQueue
   DGFontManager.{h,m}           resolve Cascadia Code (registered via Info.plist)
+  DGCoverCache.{h,m}            two-level (memory + disk) cover-bytes cache
+  DGServerPrefs.{h,m}           saved gopher-spot host/port (NSUserDefaults)
+  DGBookmarkStore.{h,m}         gopher bookmarks in a hand-editable gophermap
+  DGANSIParser/DGANSIPalette/DGANSISpan.{h,m}   ANSI 256-color/truecolor styling
+  DGMediaKeyTap.{h,m}, DGMediaKeyRouter.{h,m}   global media-key capture (event tap)
   DGNowPlayingWindowController.{h,m}   window + poll + audio + transport controls
-  DGSearchWindowController.{h,m}   search field + results table + play / add-to-queue
-  DGQueueWindowController.{h,m}    upcoming-queue table (/spot/api/1/queue)
+  DGLibraryWindowController.{h,m}   segmented Busca / Fila / Playlists window
+  DGPreferencesController.{h,m}    Preferences (⌘,) host/port + Test Connection
+  DGGopherWindowController.{h,m}   general RFC 1436 gopher browser windows
   AppDelegate.{h,m}, main.m     programmatic app + menu bar (Controls menu)
 tests/
   DGApiParserTests.m            parser/model edge cases + on-disk fixtures
   DGGopherClientTests.m         client state machine vs a localhost loopback
   DGPLSParserTests.m            stream-URL extraction (PLS + M3U)
   DGTrackItemTests.m            v1 list parsing (queue/search item.<i>.*)
-Tests/Fixtures/                 now_live + degenerate /now + stream.pls + cover + search + queue
+tests/Fixtures/                 now_live + degenerate /now + stream.pls + cover + search + queue
 Resources/
   Fonts/CascadiaCode-Regular.ttf   bundled font (ATSApplicationFontsPath = Fonts)
   DeGelato.icns, OFL.txt
@@ -186,4 +192,4 @@ Resources/
 ## Not yet
 
 Playlists (the machine API lists them, but `/playlists/<id>` tracks are often
-`forbidden` — context play works). No prefs, no TLS, nothing off-LAN.
+`forbidden` — context play works). No TLS, nothing off-LAN.

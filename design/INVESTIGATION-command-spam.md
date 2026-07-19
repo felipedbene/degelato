@@ -59,7 +59,7 @@ implicated by the same working-diff changes (catch-up polling, common-modes stre
 - The write happens later, on the run loop, when the output stream signals
   `NSStreamEventHasSpaceAvailable` → `-writeRequestIfPossible` → `[_output write:…]`
   (`DGGopherClient.m:133` → `:174`). For a TCP socket, `HasSpaceAvailable` fires **as soon
-  as the connection completes** (the send buffer is empty). To `10.0.100.112:70` on the LAN,
+  as the connection completes** (the send buffer is empty). To `192.0.2.10:70` on the LAN,
   connect + first writable event is **sub-millisecond to a few ms** — i.e. the *next*
   run-loop iteration. The selector line is tiny (`/spot/api/1/next\r\n`) so it flushes in
   one `write`.
@@ -265,7 +265,7 @@ callbacks. DeGelato's `DGGopherClient` is run-loop-based, so it has to choose.
 
 ## R7 — The in-flight `_client` pointer wedges (live-confirmed; app stops connecting)
 
-Surfaced while setting up the live repro on the G5 (`macg5`, 10.5.9, PPC, the running
+Surfaced while setting up the live repro on the G5 (`<ppc-host>`, 10.5.9, PPC, the running
 `DeGelato.app` built Jul 3 22:37 from the current buggy source). Symptom the owner reported:
 *"it's not even connecting."* Screenshots show real data (`state playing`/`stopped`,
 `device idle`) under a persistent red **`offline — retrying`**.
@@ -273,14 +273,14 @@ Surfaced while setting up the live repro on the G5 (`macg5`, 10.5.9, PPC, the ru
 **Live evidence gathered (all read-only):**
 
 1. **Raw TCP works, repeatedly.** From the same G5:
-   `printf '/spot/api/1/now\r\n' | nc 10.0.100.112 70` returns a valid `/now` every time
+   `printf '/spot/api/1/now\r\n' | nc 192.0.2.10 70` returns a valid `/now` every time
    (`state stopped, device active`, `ts …`). Network + server + both replicas are healthy.
 2. **The app served exactly ONE request, then nothing.** Server logs (both pods, UTC,
    clock-aligned with the G5 — verified: a probe at `16:09:26Z` logged as `16:09:26Z`):
    one `/spot/api/1/now` at `16:11:23Z` on launch, then **zero** for 45+ minutes —
    including across an explicit **Refresh** click at `~16:56Z` (log window empty).
 3. **The app holds no sockets and isn't trying.** `lsof -nP -iTCP -p <pid>` → `NONE-INET`;
-   `netstat` shows no connection to `10.0.100.112`. Checked repeatedly, including right
+   `netstat` shows no connection to `192.0.2.10`. Checked repeatedly, including right
    after Refresh — never a single SYN_SENT/ESTABLISHED to `:70`.
 4. **The main thread is a healthy idle run loop, not hung.** `sample <pid>`:
    `-[NSApplication run] → nextEventMatchingMask → mach_msg_trap` (parked waiting for
@@ -298,7 +298,7 @@ pollTick _client=0x0 → refresh created 0x3e7bb30 → client START 0x3e7bb30 se
    ‹ no WROTE, no EOF — the CFStream never opens ›
 pollTick _client=0x3e7bb30 → refresh GUARD-HIT (skipping)        × 5, over the next 10 s
 client TIMEOUT 0x3e7bb30  wrote=0                                ← selector never written
-client FAIL … "Timed out talking to 10.0.100.112:70"
+client FAIL … "Timed out talking to 192.0.2.10:70"
 didFail _client=0x3e7bb30 -> nil
 pollTick _client=0x0 → refresh created 0x3e7c020 → START → ‹hangs again›
 ```

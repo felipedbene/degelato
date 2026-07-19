@@ -52,7 +52,7 @@
 {
     STAssertEqualObjects([DGServerPrefs host], [DGServerPrefs defaultHost], @"unset -> default host");
     STAssertEquals([DGServerPrefs port], [DGServerPrefs defaultPort], @"unset -> default port");
-    STAssertEqualObjects([DGServerPrefs defaultHost], @"10.0.100.112", @"homelab default");
+    STAssertEqualObjects([DGServerPrefs defaultHost], @"192.0.2.10", @"placeholder default");
     STAssertEquals([DGServerPrefs defaultPort], (NSInteger)70, @"gopher default");
 }
 

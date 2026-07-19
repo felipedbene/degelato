@@ -9,7 +9,7 @@ NSString * const DGSpotHostKey = @"DGSpotHost";
 NSString * const DGSpotPortKey = @"DGSpotPort";
 NSString * const DGServerPrefsDidChangeNotification = @"DGServerPrefsDidChangeNotification";
 
-#define DG_SPOT_DEFAULT_HOST @"10.0.100.112"
+#define DG_SPOT_DEFAULT_HOST @"192.0.2.10"
 #define DG_SPOT_DEFAULT_PORT 70
 
 @implementation DGServerPrefs

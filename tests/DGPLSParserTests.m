@@ -14,9 +14,9 @@
 - (void)testPLSBasic
 {
     NSString *pls = @"[playlist]\r\nNumberOfEntries=1\r\n"
-                    @"File1=http://10.0.100.113:8000/spotify.mp3\r\nVersion=2\r\n";
+                    @"File1=http://192.0.2.11:8000/spotify.mp3\r\nVersion=2\r\n";
     STAssertEqualObjects([DGPLSParser firstURLFromPlaylistText:pls],
-                         @"http://10.0.100.113:8000/spotify.mp3", @"File1 URL extracted");
+                         @"http://192.0.2.11:8000/spotify.mp3", @"File1 URL extracted");
 }
 
 - (void)testPLSLowestIndexWins
