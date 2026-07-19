@@ -4,8 +4,7 @@
 
 <img src="design/icon/degelato-icon-glossy.png" alt="DeGelato icon" width="96" align="right">
 
-> 📸 _Screenshot coming soon — DeGelato on a Power Mac G5 (OS X 10.5 Leopard)._
-<!-- When you capture one, replace the line above with: ![DeGelato on 10.5](design/screenshot.png) -->
+![DeGelato on Mac OS X 10.5 (Sorbet Leopard, PowerPC) — driving the player and queue while a Gopher browser reads gopher.debene.dev and its ANSI CTA map](design/screenshot.png)
 
 A native Cocoa Spotify remote — *the essential Radinho* — for **Sorbet Leopard
 10.5.x on a Power Mac G5** (ppc, 32-bit). It is the PowerPC sibling of
