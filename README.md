@@ -1,5 +1,12 @@
 # DeGelato
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) ![Platform](https://img.shields.io/badge/Mac%20OS%20X-10.5%20PPC-black.svg) ![Lang](https://img.shields.io/badge/Cocoa-Objective--C-555.svg)
+
+<img src="design/icon/degelato-icon-glossy.png" alt="DeGelato icon" width="96" align="right">
+
+> 📸 _Screenshot coming soon — DeGelato on a Power Mac G5 (OS X 10.5 Leopard)._
+<!-- When you capture one, replace the line above with: ![DeGelato on 10.5](design/screenshot.png) -->
+
 A native Cocoa Spotify remote — *the essential Radinho* — for **Sorbet Leopard
 10.5.x on a Power Mac G5** (ppc, 32-bit). It is the PowerPC sibling of
 [DeToca](https://github.com/felipedbene/detoca) (Snow Leopard 10.6.8) — and the
@@ -193,3 +200,10 @@ Resources/
 
 Playlists (the machine API lists them, but `/playlists/<id>` tracks are often
 `forbidden` — context play works). No TLS, nothing off-LAN.
+
+---
+### Part of the gopher constellation
+**Servers & tools:** [gopher-core](https://github.com/felipedbene/gopher-core) · [gopher-cta](https://github.com/felipedbene/gopher-cta) · [gopher-blog](https://github.com/felipedbene/gopher-blog) · [gopher-askthedeck](https://github.com/felipedbene/gopher-askthedeck) · [gopher-spot](https://github.com/felipedbene/gopher-spot) · [the-economist-epub](https://github.com/felipedbene/the-economist-epub)
+**Clients:** [casquinha](https://github.com/felipedbene/casquinha) (Mac OS 9) · [detoca](https://github.com/felipedbene/detoca) (OS X 10.6) · [degelato](https://github.com/felipedbene/degelato) (OS X 10.5 PPC) · [deburrow](https://github.com/felipedbene/deburrow) (Android)
+**Protocol notes:** [fhb](https://github.com/felipedbene/fhb)
+---
