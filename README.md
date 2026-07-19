@@ -6,6 +6,15 @@
 
 ![DeGelato on Mac OS X 10.5 (Sorbet Leopard, PowerPC) — driving the player and queue while a Gopher browser reads gopher.debene.dev and its ANSI CTA map](design/screenshot.png)
 
+<details>
+<summary><b>🕵️ Yes, it's a real Power Mac G5 — proof</b></summary>
+
+Sorbet Leopard is themed to look like macOS Sierra, but *About This Mac* doesn't lie: a **Dual 1.8 GHz PowerPC G5** (`PowerMac7,3`), booting `sorbetOS`. (Serial number and MAC address redacted.)
+
+![About This Mac on the real Power Mac G5 — Dual 1.8 GHz PowerPC G5, Sorbet Leopard themed as macOS Sierra](design/proof-real-g5.png)
+
+</details>
+
 A native Cocoa Spotify remote — *the essential Radinho* — for **Sorbet Leopard
 10.5.x on a Power Mac G5** (ppc, 32-bit). It is the PowerPC sibling of
 [DeToca](https://github.com/felipedbene/detoca) (Snow Leopard 10.6.8) — and the
